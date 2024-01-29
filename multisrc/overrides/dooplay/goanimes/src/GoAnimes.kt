@@ -8,6 +8,7 @@ import eu.kanade.tachiyomi.animeextension.pt.goanimes.extractors.PlaylistExtract
 import eu.kanade.tachiyomi.animesource.model.SEpisode
 import eu.kanade.tachiyomi.animesource.model.Video
 import eu.kanade.tachiyomi.lib.bloggerextractor.BloggerExtractor
+import eu.kanade.tachiyomi.lib.playlistutils.PlaylistUtils
 import eu.kanade.tachiyomi.multisrc.dooplay.DooPlay
 import eu.kanade.tachiyomi.network.GET
 import eu.kanade.tachiyomi.network.await
@@ -40,7 +41,7 @@ class GoAnimes : DooPlay(
         val url = season.attr("href")
         return client.newCall(GET(url, headers))
             .execute()
-            .use { it.asJsoup() }
+            .asJsoup()
             .let(::getSeasonEpisodes)
     }
 
@@ -54,7 +55,7 @@ class GoAnimes : DooPlay(
                     doc.selectFirst(episodeListNextPageSelector)?.let {
                         val url = it.attr("abs:href")
                         doc = client.newCall(GET(url, headers)).execute()
-                            .use { it.asJsoup() }
+                            .asJsoup()
                     }
                 }
                 addAll(super.getSeasonEpisodes(doc))
@@ -70,25 +71,30 @@ class GoAnimes : DooPlay(
     private val goanimesExtractor by lazy { GoAnimesExtractor(client, headers) }
     private val bloggerExtractor by lazy { BloggerExtractor(client) }
     private val linkfunBypasser by lazy { LinkfunBypasser(client) }
+    private val playlistUtils by lazy { PlaylistUtils(client, headers) }
 
     override fun videoListParse(response: Response): List<Video> {
-        val document = response.use { it.asJsoup() }
+        val document = response.asJsoup()
         val players = document.select("ul#playeroptionsul li")
         return players.parallelCatchingFlatMapBlocking(::getPlayerVideos)
     }
 
     private suspend fun getPlayerVideos(player: Element): List<Video> {
+        val name = player.selectFirst("span.title")!!.text()
+            .replace("FULLHD", "1080p")
+            .replace("HD", "720p")
+            .replace("SD", "480p")
         val url = getPlayerUrl(player)
         return when {
-            "player5.goanimes.net" in url -> goanimesExtractor.videosFromUrl(url)
+            "player5.goanimes.net" in url -> goanimesExtractor.videosFromUrl(url, name)
             "https://gojopoolt" in url -> {
                 val headers = headers.newBuilder()
                     .set("referer", url)
                     .build()
 
                 val script = client.newCall(GET(url, headers)).await()
-                    .use { it.body.string() }
-                    .let { JsDecoder.decodeScript(it, false) }
+                    .body.string()
+                    .let { JsDecoder.decodeScript(it, false).ifBlank { it } }
 
                 script.substringAfter("sources: [")
                     .substringBefore(']')
@@ -103,14 +109,26 @@ class GoAnimes : DooPlay(
                         val resolution = it.substringAfter("label: ", "")
                             .substringAfter('"')
                             .substringBefore('"')
-                            .ifBlank { "Default" }
+                            .ifBlank { name.split('-').last().trim() }
 
-                        Video(videoUrl, "Gojopoolt - $resolution", videoUrl, headers)
+                        val partialName = name.split('-').first().trim()
+                        return when {
+                            videoUrl.contains(".m3u8") -> {
+                                playlistUtils.extractFromHls(
+                                    videoUrl,
+                                    url,
+                                    videoNameGen = {
+                                        "$partialName - ${it.replace("Video", resolution)}"
+                                    },
+                                )
+                            }
+                            else -> listOf(Video(videoUrl, "$partialName - $resolution", videoUrl, headers))
+                        }
                     }
             }
             listOf("/bloggerjwplayer", "/m3u8", "/multivideo").any { it in url } -> {
                 val script = client.newCall(GET(url)).await()
-                    .use { it.body.string() }
+                    .body.string()
                     .let(JsDecoder::decodeScript)
                 when {
                     "/bloggerjwplayer" in url ->
@@ -121,7 +139,8 @@ class GoAnimes : DooPlay(
                         script.substringAfter("attr")
                             .substringAfter(" \"")
                             .substringBefore('"')
-                            .let(goanimesExtractor::videosFromUrl)
+                            .let { goanimesExtractor.videosFromUrl(it, name) }
+
                     else -> emptyList<Video>()
                 }
             }
@@ -136,7 +155,7 @@ class GoAnimes : DooPlay(
         val num = player.attr("data-nume")
         val url = client.newCall(GET("$baseUrl/wp-json/dooplayer/v2/$id/$type/$num"))
             .await()
-            .use { it.body.string() }
+            .body.string()
             .substringAfter("\"embed_url\":\"")
             .substringBefore("\",")
             .replace("\\", "")
@@ -144,7 +163,7 @@ class GoAnimes : DooPlay(
         return when {
             "/protetorlinks/" in url -> {
                 val link = client.newCall(GET(url)).await()
-                    .use { it.asJsoup() }
+                    .asJsoup()
                     .selectFirst("a[href]")!!.attr("href")
 
                 client.newCall(GET(link)).await()
@@ -152,5 +171,16 @@ class GoAnimes : DooPlay(
             }
             else -> url
         }
+    }
+    // ============================= Utilities ==============================
+
+    override fun List<Video>.sort(): List<Video> {
+        val quality = preferences.getString(videoSortPrefKey, videoSortPrefDefault)!!
+        return sortedWith(
+            compareBy(
+                { it.quality.contains(quality) },
+                { Regex("""(\d+)p""").find(it.quality)?.groupValues?.get(1)?.toIntOrNull() ?: 0 },
+            ),
+        ).reversed()
     }
 }
