@@ -1,8 +1,8 @@
 ext {
     extName = 'Anime-Base'
     extClass = '.AnimeBase'
-    extVersionCode = 19
-    containsNsfw = true
+    extVersionCode = 20
+    isNsfw = true
 }
 
 apply from: "$rootDir/common.gradle"

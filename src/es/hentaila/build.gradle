@@ -1,8 +1,8 @@
 ext {
     extName = 'HentaiLA'
     extClass = '.Hentaila'
-    extVersionCode = 20
-    containsNsfw = true
+    extVersionCode = 21
+    isNsfw = true
 }
 
 apply from: "$rootDir/common.gradle"

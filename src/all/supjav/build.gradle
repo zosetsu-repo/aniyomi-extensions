@@ -1,8 +1,8 @@
 ext {
     extName = 'SupJav'
     extClass = '.SupJavFactory'
-    extVersionCode = 2
-    containsNsfw = true
+    extVersionCode = 3
+    isNsfw = true
 }
 
 apply from: "$rootDir/common.gradle"
