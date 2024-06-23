@@ -148,7 +148,7 @@ jobs:
         uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4
         with:
           repository: Dark25/aniyomi-extensions
-          token: ${{ secrets.ANIYOMIORG_BOT_PAT }}
+          token: ${{ secrets.GITHUB_TOKEN }}
           ref: repo
           path: repo
 
@@ -167,7 +167,7 @@ jobs:
           rsync -a --delete --exclude .git --exclude .gitignore ../master/repo/ .
           git config --local user.email "Animetail-Bot@users.noreply.github.com"
           git config --local user.name "Animetail-Bot"
-          git remote set-url origin https://Animetail-Bot:${{ secrets.ANIYOMIORG_BOT_PAT }}@github.com/Dark25/aniyomi-extensions.git
+          git remote set-url origin https://Animetail-Bot:${{ secrets.GITHUB_TOKEN }}@github.com/Dark25/aniyomi-extensions.git
           git status
              if [ -n "$(git status --porcelain)" ]; then
                 git add .
