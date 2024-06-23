@@ -156,9 +156,9 @@ jobs:
         run: |
           cd repo
           rsync -a --delete --exclude .git --exclude .gitignore ../master/repo/ .
-          git config --local user.email "Animetail-Bot@users.noreply.github.com"
-          git config --local user.name "Animetail-Bot"
-          git remote set-url origin https://Animetail-Bot:${{ secrets.GITHUB_TOKEN }}@github.com/Dark25/aniyomi-extensions.git
+          git config --local user.email "Animetail-bot@users.noreply.github.com"
+          git config --local user.name "Animetail-bot"
+          git remote set-url origin https://Animetail-bot:${{ secrets.GITHUB_TOKEN }}@github.com/Dark25/aniyomi-extensions.git
           git status
              if [ -n "$(git status --porcelain)" ]; then
                 git add .
