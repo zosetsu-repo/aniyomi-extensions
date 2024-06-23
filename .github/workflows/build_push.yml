@@ -97,8 +97,7 @@ jobs:
           distribution: temurin
 
       - name: Prepare signing key
-        run: |
-          echo ${{ secrets.SIGNING_KEY }} | base64 -d > signingkey.jks
+        run: echo "${{ secrets.SIGNING_KEY }}" | base64 --decode > signingkey.jks
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@417ae3ccd767c252f5661f1ace9f835f9654f2b5 # v3
@@ -113,7 +112,6 @@ jobs:
 
       - name: Upload APKs (chunk ${{ matrix.chunk }})
         uses: actions/upload-artifact@5d5d22a31266ced268874388b861e4b58bb5c2f3 # v4
-        if: "github.repository == 'aniyomiorg/aniyomi-extensions'"
         with:
           name: "individual-apks-${{ matrix.chunk }}"
           path: "**/*.apk"
@@ -126,7 +124,6 @@ jobs:
     name: Publish repo
     needs:
       - build_individual
-    if: "github.repository == 'aniyomiorg/aniyomi-extensions'"
     runs-on: ubuntu-latest
     steps:
       - name: Download APK artifacts
@@ -150,7 +147,7 @@ jobs:
         run: |
           cd master
           python ./.github/scripts/move-apks.py
-          INSPECTOR_LINK="$(curl -s "https://api.github.com/repos/aniyomiorg/aniyomi-extensions-inspector/releases/latest" | jq -r '.assets[0].browser_download_url')"
+          INSPECTOR_LINK="$(curl -s "https://api.github.com/repos/Dark25/aniyomi-extensions-inspector/releases/latest" | jq -r '.assets[0].browser_download_url')"
           curl -L "$INSPECTOR_LINK" -o ./Inspector.jar
           java -jar ./Inspector.jar "repo/apk" "output.json" "tmp"
           python ./.github/scripts/create-repo.py
@@ -158,7 +155,7 @@ jobs:
       - name: Checkout repo branch
         uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4
         with:
-          repository: aniyomiorg/aniyomi-extensions
+          repository: Dark25/aniyomi-extensions
           token: ${{ secrets.ANIYOMIORG_BOT_PAT }}
           ref: repo
           path: repo
@@ -172,7 +169,19 @@ jobs:
           git_commit_gpgsign: true
           workdir: repo
 
-      - name: Deploy repo
+      - name: Commit files
         run: |
           cd repo
-          ../master/.github/scripts/commit-repo.sh
+          rsync -a --delete --exclude .git --exclude .gitignore ../master/repo/ .
+          git config --local user.email "Animetail-Bot@users.noreply.github.com"
+          git config --local user.name "Animetail-Bot"
+          git remote set-url origin https://Animetail-Bot:${{ secrets.ANIYOMIORG_BOT_PAT }}@github.com/Dark25/aniyomi-extensions.git
+          git status
+             if [ -n "$(git status --porcelain)" ]; then
+                git add .
+                git commit -S -m "Update extensions repo"
+                git push -u origin repo
+                curl https://purge.jsdelivr.net/gh/Dark25/aniyomi-extensions@repo/index.min.json
+          else
+                echo "No changes to commit"
+          fi
