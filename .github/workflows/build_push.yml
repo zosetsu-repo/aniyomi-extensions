@@ -152,19 +152,8 @@ jobs:
           ref: repo
           path: repo
 
-      - name: Commit files
+      - name: Deploy repo
         run: |
-          cd repo
-          rsync -a --delete --exclude .git --exclude .gitignore ../master/repo/ .
-          git config --local user.email "Animetail-bot@users.noreply.github.com"
-          git config --local user.name "Animetail-bot"
-          git remote set-url origin https://Animetail-bot:${{ secrets.GITHUB_TOKEN }}@github.com/Dark25/aniyomi-extensions.git
-          git status
-             if [ -n "$(git status --porcelain)" ]; then
-                git add .
-                git commit -S -m "Update extensions repo"
-                git push -u origin repo
-                curl https://purge.jsdelivr.net/gh/Dark25/aniyomi-extensions@repo/index.min.json
-          else
-                echo "No changes to commit"
-          fi
+            cd repo
+            chmod +x ../master/.github/scripts/commit-repo.sh
+            ../master/.github/scripts/commit-repo.sh
