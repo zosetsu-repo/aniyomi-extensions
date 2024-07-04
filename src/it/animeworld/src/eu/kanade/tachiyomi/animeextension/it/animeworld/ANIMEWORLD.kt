@@ -140,7 +140,7 @@ class ANIMEWORLD : ConfigurableAnimeSource, ParsedAnimeHttpSource() {
             serverList.add(Pair(name, url))
         }
 
-        val videoList = serverList.parallelCatchingFlatMapBlocking { server ->
+        val videoList = serverList.flatMap { server ->
             val url = server.second
             when {
                 url.contains("streamingaw") -> {
