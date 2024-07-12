@@ -393,14 +393,13 @@ class Jellyfin(private val suffix: String) : ConfigurableAnimeSource, AnimeHttpS
     companion object {
         private const val SEASONS_FETCH_LIMIT = 20
         private const val SERIES_FETCH_LIMIT = 5
-        private val ALLOWED_LIBRARIES = listOf(
-            "unknown",
-            "movies",
-            "tvshows",
-            "homevideos",
-            "boxsets",
-            "playlists",
-            "folders",
+        private val LIBRARY_BLACKLIST = listOf(
+            "music",
+            "musicvideos",
+            "trailers",
+            "books",
+            "photos",
+            "livetv",
         )
 
         const val APIKEY_KEY = "api_key"
@@ -689,7 +688,7 @@ class Jellyfin(private val suffix: String) : ConfigurableAnimeSource, AnimeHttpS
                 mediaLibraries = client.newCall(
                     GET("$baseUrl/Users/$userId/Items"),
                 ).execute().parseAs<ItemListDto>().items.filter {
-                    it.collectionType in ALLOWED_LIBRARIES
+                    it.collectionType !in LIBRARY_BLACKLIST
                 }.map {
                     Pair(it.name, it.id)
                 }
