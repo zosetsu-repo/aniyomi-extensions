@@ -201,8 +201,8 @@ class AnimesGames : ParsedAnimeHttpSource() {
     private val bloggerExtractor by lazy { BloggerExtractor(client) }
     override fun videoListParse(response: Response): List<Video> {
         val doc = response.asJsoup()
-        val url = doc.selectFirst("div.Link > a")
-            ?.attr("href")
+        val url = doc.selectFirst("div#player iframe")
+            ?.attr("src")
             ?: return emptyList()
 
         val playerDoc = client.newCall(GET(url, headers)).execute()
