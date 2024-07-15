@@ -538,7 +538,7 @@ class Jellyfin(private val suffix: String) : ConfigurableAnimeSource, AnimeHttpS
             validationMessage = "The URL is invalid, malformed, or ends with a slash",
             key = HOSTURL_KEY,
             restartRequired = true,
-        ) { preferences.clearApiKey() }
+        ) { preferences.clearCredentials() }
 
         screen.addEditTextPreference(
             title = "Username",
@@ -546,7 +546,7 @@ class Jellyfin(private val suffix: String) : ConfigurableAnimeSource, AnimeHttpS
             summary = username.ifBlank { "The user account name" },
             key = USERNAME_KEY,
             restartRequired = true,
-        ) { preferences.clearApiKey() }
+        ) { preferences.clearCredentials() }
 
         screen.addEditTextPreference(
             title = "Password",
@@ -555,7 +555,7 @@ class Jellyfin(private val suffix: String) : ConfigurableAnimeSource, AnimeHttpS
             inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD,
             key = PASSWORD_KEY,
             restartRequired = true,
-        ) { preferences.clearApiKey() }
+        ) { preferences.clearCredentials() }
 
         ListPreference(screen.context).apply {
             key = MEDIALIB_KEY
