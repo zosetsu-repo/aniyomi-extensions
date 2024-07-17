@@ -11,7 +11,7 @@ if [ -n "$(git status --porcelain)" ]; then
     git push
 
     # Purge cached index on jsDelivr
-    curl https://purge.jsdelivr.net/gh/Animetail-bot/aniyomi-extensions@repo/index.min.json
+    curl https://purge.jsdelivr.net/gh/Dark25/aniyomi-extensions@repo/index.min.json
 else
     echo "No changes to commit"
 fi
