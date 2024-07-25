@@ -17,7 +17,6 @@ import okhttp3.Request
 import okhttp3.Response
 import org.jsoup.nodes.Document
 import org.jsoup.nodes.Element
-import uy.kohesive.injekt.api.get
 
 class AnimeOnlineNinja : DooPlay(
     "es",
@@ -175,7 +174,7 @@ class AnimeOnlineNinja : DooPlay(
         val id = player.attr("data-post")
         val num = player.attr("data-nume")
         return client.newCall(GET("$baseUrl/wp-json/dooplayer/v1/post/$id?type=$type&source=$num"))
-    .execute().body.string()
+            .execute().body.string()
             .substringAfter("\"embed_url\":\"")
             .substringBefore("\",")
             .replace("\\", "")
