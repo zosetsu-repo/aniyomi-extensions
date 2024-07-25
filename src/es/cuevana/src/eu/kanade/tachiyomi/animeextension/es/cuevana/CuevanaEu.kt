@@ -202,8 +202,8 @@ class CuevanaEu(override val name: String, override val baseUrl: String) : Confi
                 val response = client.newCall(GET(urlRequest, headers = headers)).execute().asJsoup()
                 val bodyText = response.select("body").text()
                 val json = json.decodeFromString<JsonObject>(bodyText)
-                val status = json["status"]!!.jsonPrimitive!!.content
-                val file = json["file"]!!.jsonPrimitive!!.content
+                val status = json["status"]!!.jsonPrimitive.content
+                val file = json["file"]!!.jsonPrimitive.content
                 if (status == "200") { videoList.add(Video(file, "$prefix Tomatomatela", file, headers = null)) }
             } catch (_: Exception) { }
         }
