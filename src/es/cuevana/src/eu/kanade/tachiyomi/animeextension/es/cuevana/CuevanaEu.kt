@@ -212,7 +212,7 @@ class CuevanaEu(override val name: String, override val baseUrl: String) : Confi
             videoList.addAll(videos)
         }
         if (embedUrl.contains("doodstream") || embedUrl.contains("dood.")) {
-            DoodExtractor(client).videoFromUrl(url, "$prefix DoodStream", false)
+            DoodExtractor(client).videoFromUrl(url, "$prefix DoodStream")
                 ?.let { videoList.add(it) }
         }
         if (embedUrl.contains("okru") || embedUrl.contains("ok.ru")) {
