@@ -54,7 +54,7 @@ def commit_changes():
     subprocess.check_call(["git", "config", "--local", "user.email", BOT_EMAIL])
     subprocess.check_call(["git", "config", "--local", "user.name", BOT_NAME])
     subprocess.check_call(["git", "add"] + paths)
-    subprocess.check_call(["git", "commit", "-m", "[skip ci] chore: Mass-bump on extensions"])
+    subprocess.check_call(["git", "commit", "-S", "-m", "[skip ci] chore: Mass-bump on extensions"])
     subprocess.check_call(["git", "push"])
 
 if __name__ == "__main__":
