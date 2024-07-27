@@ -236,19 +236,19 @@ class Cinecalidad : ConfigurableAnimeSource, ParsedAnimeHttpSource() {
             val url = element.attr("data-option")
 
             when {
-                server.contains("streamtape", ignoreCase = true) || server.contains("stp", ignoreCase = true) || server.contains("stape", ignoreCase = true) -> {
+                server.contains("streamtape") || server.contains("stp") || server.contains("stape") -> {
                     listOfNotNull(streamTapeExtractor.videoFromUrl(url, quality = "StreamTape"))
                 }
-                server.contains("okru", ignoreCase = true) || server.contains("ok.", ignoreCase = true) -> okruExtractor.videosFromUrl(url, fixQualities = true)
-                server.contains("voe", ignoreCase = true) -> voeExtractor.videosFromUrl(url)
-                server.contains("filemoon", ignoreCase = true) -> filemoonExtractor.videosFromUrl(url, prefix = "Filemoon:")
-                server.contains("wishembed", ignoreCase = true) || server.contains("streamwish", ignoreCase = true) || server.contains("strwish", ignoreCase = true) || server.contains("wish", ignoreCase = true) -> {
+                server.contains("okru") || server.contains("ok.") -> okruExtractor.videosFromUrl(url, fixQualities = true)
+                server.contains("voe") -> voeExtractor.videosFromUrl(url)
+                server.contains("filemoon") -> filemoonExtractor.videosFromUrl(url, prefix = "Filemoon:")
+                server.contains("wishembed") || server.contains("streamwish") || server.contains("strwish") || server.contains("wish") -> {
                     streamWishExtractor.videosFromUrl(url, videoNameGen = { "StreamWish:$it" })
                 }
-                server.contains("doodstream", ignoreCase = true) || server.contains("dood.", ignoreCase = true) || server.contains("ds2play", ignoreCase = true) || server.contains("doods.", ignoreCase = true) -> {
+                server.contains("doodstream") || server.contains("dood.") || server.contains("ds2play") || server.contains("doods.") -> {
                     doodExtractor.videosFromUrl(url, "DoodStream")
                 }
-                server.contains("vidhide", ignoreCase = true) || server.contains("vid.", ignoreCase = true) -> {
+                server.contains("vidhide") || server.contains("vid.") -> {
                     vidHideExtractor.videosFromUrl(url) { "VidHide:$it" }
                 }
                 else -> emptyList()
