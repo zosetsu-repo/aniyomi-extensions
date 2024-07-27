@@ -11,8 +11,8 @@ VERSION_STR = "VersionCode ="
 VERSION_REGEX = re.compile(f"{VERSION_STR} (\\d+)")
 BUMPED_FILES: list[Path] = []
 
-BOT_EMAIL = "action@github.com"
-BOT_NAME = "GitHub Action"
+BOT_EMAIL = "github-actions[bot]@users.noreply.github.com"
+BOT_NAME = "animetail-bot[bot]"
 
 def has_match(query: str, file: Path) -> tuple[Path, bool]:
     return (file, query in file.read_text())
@@ -54,7 +54,7 @@ def commit_changes():
     subprocess.check_call(["git", "config", "--local", "user.email", BOT_EMAIL])
     subprocess.check_call(["git", "config", "--local", "user.name", BOT_NAME])
     subprocess.check_call(["git", "add"] + paths)
-    subprocess.check_call(["git", "commit", "-S", "-m", "[skip ci] chore: Mass-bump on extensions"])
+    subprocess.check_call(["git", "commit", "-m", "[skip ci] chore: Mass-bump on extensions"])
     subprocess.check_call(["git", "push"])
 
 if __name__ == "__main__":
