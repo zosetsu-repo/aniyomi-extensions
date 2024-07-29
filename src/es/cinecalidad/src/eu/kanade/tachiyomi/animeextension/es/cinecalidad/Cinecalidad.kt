@@ -50,11 +50,12 @@ class Cinecalidad : ConfigurableAnimeSource, ParsedAnimeHttpSource() {
     override fun popularAnimeSelector(): String = "div.custom.animation-2.items.normal article"
 
     override fun popularAnimeFromElement(element: Element): SAnime {
-        val anime = SAnime.create()
-        anime.title = element.select("div.poster div.in_title").text()
-        anime.thumbnail_url = element.select("div.poster img").attr("data-src")
-        anime.setUrlWithoutDomain(element.select("div.poster > a").attr("href"))
-        return anime
+        return SAnime.create().apply {
+            title = element.select("div.poster div.in_title").text().trim()
+            thumbnail_url = element.select("div.poster img").attr("data-src").takeIf { it.isNotEmpty() }
+            element.select("div.poster > a").attr("href").takeIf { it.isNotEmpty() }
+                ?.let { setUrlWithoutDomain(it) }
+        }
     }
 
     override fun popularAnimeNextPageSelector(): String = "div.wp-pagenavi a.nextpostslink"
@@ -317,8 +318,6 @@ class Cinecalidad : ConfigurableAnimeSource, ParsedAnimeHttpSource() {
                 }
             }
         }
-
-        // Add preferences to the screen
         screen.addPreference(
             createListPreference(
                 PREF_SERVER_KEY,
