@@ -22,6 +22,7 @@ import eu.kanade.tachiyomi.lib.voeextractor.VoeExtractor
 import eu.kanade.tachiyomi.network.GET
 import eu.kanade.tachiyomi.network.awaitSuccess
 import eu.kanade.tachiyomi.util.asJsoup
+import eu.kanade.tachiyomi.util.parallelCatchingFlatMapBlocking
 import okhttp3.Request
 import okhttp3.Response
 import org.jsoup.nodes.Document
@@ -142,45 +143,29 @@ class Cinecalidad : ConfigurableAnimeSource, ParsedAnimeHttpSource() {
 
     override fun searchAnimeSelector(): String = popularAnimeSelector()
 
-    // =========================== Anime Details ============================
     override fun animeDetailsParse(document: Document): SAnime {
-        val anime = SAnime.create()
+        return SAnime.create().apply {
+            title = document.selectFirst("div.single_left h1")?.text().orEmpty()
+            thumbnail_url = document.selectFirst("div.single_left img")?.attr("data-src")
 
-        anime.title = document.select("div.single_left h1").text()
+            description = findDescription(document)
 
-        anime.thumbnail_url = document.select("div.single_left img").attr("data-src")
-
-        val description: String
-
-        val fbLikeDescription = document.select("div.single_left > table > tbody > tr > td:nth-child(2) > p:nth-child(4)").first()?.text()
-        val tdDescription = document.select("td[style='text-align:justify;'] > p").first()?.text()
-
-        description = if (fbLikeDescription != null && fbLikeDescription.contains("Títulos:")) {
-            tdDescription ?: "sin descripción"
-        } else {
-            fbLikeDescription ?: tdDescription ?: "sin descripción"
+            genre = document.select("span:contains(Género:) a").joinToString(", ") { it.text() }
+            author = document.select("span:contains(Creador:) a").joinToString(", ") { it.text() }
+            artist = document.select("span:contains(Elenco:) a").joinToString(", ") { it.text() }
         }
+    }
 
-        anime.description = description
+    private fun findDescription(document: Document): String {
+        val fbLikeDescription = document.selectFirst("div.single_left > table > tbody > tr > td:nth-child(2) > p:nth-child(4)")?.text()
+        val tdDescription = document.selectFirst("td[style='text-align:justify;'] > p")?.text()
 
-        val genres = document.select("span:contains(Género:) a").map { it.text() }
-
-        if (genres.isNotEmpty()) {
-            anime.genre = genres.joinToString(", ")
-        }
-        val creators = document.select("span:contains(Creador:) a").map { it.text() }
-
-        if (creators.isNotEmpty()) {
-            anime.author = creators.joinToString(", ")
-        }
-
-        val cast = document.select("span:contains(Elenco:) a").map { it.text() }
-
-        if (cast.isNotEmpty()) {
-            anime.artist = cast.joinToString(", ")
-        }
-
-        return anime
+        return when {
+            fbLikeDescription?.contains("Títulos:") == true -> tdDescription
+            fbLikeDescription != null -> fbLikeDescription
+            tdDescription != null -> tdDescription
+            else -> "sin descripción"
+        } ?: "sin descripción"
     }
 
     // ============================== Episodes ==============================
@@ -221,36 +206,46 @@ class Cinecalidad : ConfigurableAnimeSource, ParsedAnimeHttpSource() {
     // ============================ Video Links =============================
 
     /*--------------------------------Video extractors------------------------------------*/
-    private val streamTapeExtractor by lazy { StreamTapeExtractor(client) }
-    private val voeExtractor by lazy { VoeExtractor(client) }
-    private val filemoonExtractor by lazy { FilemoonExtractor(client) }
-    private val streamWishExtractor by lazy { StreamWishExtractor(client, headers) }
-    private val doodExtractor by lazy { DoodExtractor(client) }
-    private val vidHideExtractor by lazy { VidHideExtractor(client, headers) }
-    private val okruExtractor by lazy { OkruExtractor(client) }
+    private val extractors by lazy {
+        mapOf(
+            "streamtape" to StreamTapeExtractor(client),
+            "okru" to OkruExtractor(client),
+            "voe" to VoeExtractor(client),
+            "filemoon" to FilemoonExtractor(client),
+            "streamwish" to StreamWishExtractor(client, headers),
+            "doodstream" to DoodExtractor(client),
+            "vidhide" to VidHideExtractor(client, headers),
+        )
+    }
+
+    private val serverPatterns = mapOf(
+        "streamtape" to listOf("streamtape", "stp", "stape"),
+        "okru" to listOf("okru", "ok."),
+        "voe" to listOf("voe"),
+        "filemoon" to listOf("filemoon"),
+        "streamwish" to listOf("wishembed", "streamwish", "strwish", "wish", "swdyu"),
+        "doodstream" to listOf("doodstream", "dood.", "ds2play", "doods."),
+        "vidhide" to listOf("vidhide", "vid."),
+    )
 
     override fun videoListParse(response: Response): List<Video> {
         val document = response.asJsoup()
-        return document.select("li.dooplay_player_option").flatMap { element ->
-            val server = element.text()
+        return document.select("li.dooplay_player_option").parallelCatchingFlatMapBlocking { element ->
+            val server = element.text().lowercase()
             val url = element.attr("data-option")
 
-            when {
-                server.contains("streamtape") || server.contains("stp") || server.contains("stape") -> {
-                    listOfNotNull(streamTapeExtractor.videoFromUrl(url, quality = "StreamTape"))
-                }
-                server.contains("okru") || server.contains("ok.") -> okruExtractor.videosFromUrl(url, fixQualities = true)
-                server.contains("voe") -> voeExtractor.videosFromUrl(url)
-                server.contains("filemoon") -> filemoonExtractor.videosFromUrl(url, prefix = "Filemoon:")
-                server.contains("wishembed") || server.contains("streamwish") || server.contains("strwish") || server.contains("wish") -> {
-                    streamWishExtractor.videosFromUrl(url, videoNameGen = { "StreamWish:$it" })
-                }
-                server.contains("doodstream") || server.contains("dood.") || server.contains("ds2play") || server.contains("doods.") -> {
-                    doodExtractor.videosFromUrl(url, "DoodStream")
-                }
-                server.contains("vidhide") || server.contains("vid.") -> {
-                    vidHideExtractor.videosFromUrl(url) { "VidHide:$it" }
-                }
+            val extractorKey = serverPatterns.entries.find { (_, patterns) ->
+                patterns.any { server.contains(it) }
+            }?.key ?: return@parallelCatchingFlatMapBlocking emptyList()
+
+            when (val extractor = extractors[extractorKey]) {
+                is StreamTapeExtractor -> listOfNotNull(extractor.videoFromUrl(url, "StreamTape"))
+                is OkruExtractor -> extractor.videosFromUrl(url, fixQualities = true)
+                is VoeExtractor -> extractor.videosFromUrl(url)
+                is FilemoonExtractor -> extractor.videosFromUrl(url, "Filemoon:")
+                is StreamWishExtractor -> extractor.videosFromUrl(url) { "StreamWish:$it" }
+                is DoodExtractor -> extractor.videosFromUrl(url, "DoodStream")
+                is VidHideExtractor -> extractor.videosFromUrl(url) { "VidHide:$it" }
                 else -> emptyList()
             }
         }
@@ -270,14 +265,18 @@ class Cinecalidad : ConfigurableAnimeSource, ParsedAnimeHttpSource() {
         val quality = preferences.getString(PREF_QUALITY_KEY, PREF_QUALITY_DEFAULT)!!
         val server = preferences.getString(PREF_SERVER_KEY, PREF_SERVER_DEFAULT)!!
         val lang = preferences.getString(PREF_LANGUAGE_KEY, PREF_LANGUAGE_DEFAULT)!!
+
         return this.sortedWith(
-            compareBy(
-                { it.quality.contains(lang, true) },
-                { it.quality.contains(server, true) },
-                { it.quality.contains(quality) },
-                { Regex("""(\d+)p""").find(it.quality)?.groupValues?.get(1)?.toIntOrNull() ?: 0 },
-            ),
-        ).reversed()
+            compareByDescending<Video> {
+                it.quality.contains(lang, true)
+            }.thenByDescending {
+                it.quality.contains(server, true)
+            }.thenByDescending {
+                it.quality.contains(quality)
+            }.thenByDescending {
+                Regex("""(\d+)p""").find(it.quality)?.groupValues?.get(1)?.toIntOrNull() ?: 0
+            },
+        )
     }
 
     // =========================== Preferences =============================
@@ -296,52 +295,55 @@ class Cinecalidad : ConfigurableAnimeSource, ParsedAnimeHttpSource() {
     }
 
     override fun setupPreferenceScreen(screen: PreferenceScreen) {
-        ListPreference(screen.context).apply {
-            key = PREF_SERVER_KEY
-            title = "Preferred server"
-            entries = SERVER_LIST
-            entryValues = SERVER_LIST
-            setDefaultValue(PREF_SERVER_DEFAULT)
-            summary = "%s"
+        fun createListPreference(
+            key: String,
+            title: String,
+            entries: Array<String>,
+            defaultValue: String,
+        ): ListPreference {
+            return ListPreference(screen.context).apply {
+                this.key = key
+                this.title = title
+                this.entries = entries
+                this.entryValues = entries
+                setDefaultValue(defaultValue)
+                summary = "%s"
 
-            setOnPreferenceChangeListener { _, newValue ->
-                val selected = newValue as String
-                val index = findIndexOfValue(selected)
-                val entry = entryValues[index] as String
-                preferences.edit().putString(key, entry).commit()
+                setOnPreferenceChangeListener { _, newValue ->
+                    val selected = newValue as String
+                    val index = findIndexOfValue(selected)
+                    val entry = entryValues[index] as String
+                    preferences.edit().putString(key, entry).commit()
+                }
             }
-        }.also(screen::addPreference)
+        }
 
-        ListPreference(screen.context).apply {
-            key = PREF_QUALITY_KEY
-            title = "Preferred quality"
-            entries = QUALITY_LIST
-            entryValues = QUALITY_LIST
-            setDefaultValue(PREF_QUALITY_DEFAULT)
-            summary = "%s"
+        // Add preferences to the screen
+        screen.addPreference(
+            createListPreference(
+                PREF_SERVER_KEY,
+                "Preferred server",
+                SERVER_LIST,
+                PREF_SERVER_DEFAULT,
+            ),
+        )
 
-            setOnPreferenceChangeListener { _, newValue ->
-                val selected = newValue as String
-                val index = findIndexOfValue(selected)
-                val entry = entryValues[index] as String
-                preferences.edit().putString(key, entry).commit()
-            }
-        }.also(screen::addPreference)
+        screen.addPreference(
+            createListPreference(
+                PREF_QUALITY_KEY,
+                "Preferred quality",
+                QUALITY_LIST,
+                PREF_QUALITY_DEFAULT,
+            ),
+        )
 
-        ListPreference(screen.context).apply {
-            key = PREF_LANGUAGE_KEY
-            title = "Preferred language"
-            entries = LANGUAGE_LIST
-            entryValues = LANGUAGE_LIST
-            setDefaultValue(PREF_LANGUAGE_DEFAULT)
-            summary = "%s"
-
-            setOnPreferenceChangeListener { _, newValue ->
-                val selected = newValue as String
-                val index = findIndexOfValue(selected)
-                val entry = entryValues[index] as String
-                preferences.edit().putString(key, entry).commit()
-            }
-        }.also(screen::addPreference)
+        screen.addPreference(
+            createListPreference(
+                PREF_LANGUAGE_KEY,
+                "Preferred language",
+                LANGUAGE_LIST,
+                PREF_LANGUAGE_DEFAULT,
+            ),
+        )
     }
 }
