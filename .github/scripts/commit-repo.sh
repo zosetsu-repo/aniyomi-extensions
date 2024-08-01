@@ -2,7 +2,7 @@
 set -e
 
 rsync -a --delete --exclude .git --exclude .gitignore --exclude repo.json ../master/repo/ .
-git config --global user.email "nadiecaca2000@gmail.com"
+git config --global user.email "action@github.com"
 git config --global user.name "Animetail-Bot"
 git status
 if [ -n "$(git status --porcelain)" ]; then

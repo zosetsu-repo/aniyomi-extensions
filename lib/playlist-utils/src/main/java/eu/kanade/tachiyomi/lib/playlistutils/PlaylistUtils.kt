@@ -131,7 +131,6 @@ class PlaylistUtils(private val client: OkHttpClient, private val headers: Heade
                 if (codec.startsWith("mp4a")) return@mapNotNull null
             }
 
-
             val resolution = it.substringAfter("RESOLUTION=")
                 .substringBefore("\n")
                 .substringAfter("x")
