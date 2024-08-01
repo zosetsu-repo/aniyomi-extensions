@@ -433,7 +433,7 @@ class AniZone : AnimeHttpSource(), ConfigurableAnimeSource {
 
     private fun parseDate(dateStr: String): Long {
         return try {
-            dateFormat.parse(dateStr)!!.time
+            DATE_FORMAT.parse(dateStr)!!.time
         } catch (_: ParseException) {
             0L
         }
@@ -447,7 +447,7 @@ class AniZone : AnimeHttpSource(), ConfigurableAnimeSource {
 
     companion object {
         private val MULTILINE_REGEX = Regex("""\n{2,}""")
-        private val dateFormat by lazy { SimpleDateFormat("yyyy-MM-dd", Locale.ENGLISH) }
+        private val DATE_FORMAT by lazy { SimpleDateFormat("yyyy-MM-dd", Locale.ENGLISH) }
 
         private const val ANIME_SNAPSHOT_KEY = "anime_snapshot_key"
         private const val EPISODE_SNAPSHOT_KEY = "episode_snapshot_key"
