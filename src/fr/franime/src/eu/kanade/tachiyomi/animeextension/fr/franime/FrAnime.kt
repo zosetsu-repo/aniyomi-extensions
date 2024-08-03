@@ -102,7 +102,7 @@ class FrAnime : AnimeHttpSource() {
 
                 SEpisode.create().apply {
                     setUrlWithoutDomain(anime.url + "&ep=${index + 1}")
-                    name = episode.title
+                    name = episode.title ?: "Episode ${index + 1}"
                     episode_number = (index + 1).toFloat()
                 }
             }
