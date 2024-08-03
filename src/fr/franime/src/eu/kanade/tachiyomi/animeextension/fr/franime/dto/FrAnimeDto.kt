@@ -68,7 +68,7 @@ data class Season(
 
 @Serializable
 data class Episode(
-    @SerialName("title") val title: String = "!No Title!",
+    @SerialName("title") val title: String?,
     @SerialName("lang") val languages: EpisodeLanguages,
 )
 
