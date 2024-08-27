@@ -30,7 +30,7 @@ class HentaiZM : ParsedAnimeHttpSource(), ConfigurableAnimeSource {
 
     override val name = "HentaiZM"
 
-    override val baseUrl = "https://www.hentaizm.pro"
+    override val baseUrl = "https://www.hentaizm.fun"
 
     override val lang = "tr"
 
