@@ -32,7 +32,7 @@ abstract class AniListAnimeHttpSource : AnimeHttpSource() {
             query = ANIME_LIST_QUERY,
             variables = AnimeListVariables(
                 page = page,
-                sort = AnimeListVariables.MediaSort.POPULARITY_DESC,
+                sort = AnimeListVariables.MediaSort.TRENDING_DESC,
             ),
         )
     }

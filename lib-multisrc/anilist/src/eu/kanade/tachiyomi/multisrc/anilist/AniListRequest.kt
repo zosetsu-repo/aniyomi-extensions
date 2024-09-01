@@ -63,7 +63,7 @@ internal data class AnimeListVariables(
     val search: String? = null,
 ) {
     enum class MediaSort {
-        POPULARITY_DESC,
+        TRENDING_DESC,
         SEARCH_MATCH,
         START_DATE_DESC,
     }
