@@ -229,7 +229,7 @@ class YugenAnime : ParsedAnimeHttpSource() {
     }
 
     // ============================== Episodes ==============================
-    override fun episodeListSelector(): String = "ul.ep-grid li.ep-card" // Selector de cada episodio en la lista
+    override fun episodeListSelector(): String = "ul.ep-grid li.ep-card"
     override fun episodeListRequest(anime: SAnime): Request {
         val url = "$baseUrl${anime.url}watch/"
         Log.d("EpisodeListRequest", url)
