@@ -14,7 +14,6 @@ import eu.kanade.tachiyomi.util.parseAs
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import okhttp3.FormBody
-import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.Response
@@ -72,118 +71,151 @@ class YugenAnime : ParsedAnimeHttpSource() {
 
     // =============================== Search ===============================
 
-    override fun getFilterList(): AnimeFilterList = AnimeFilterList(
-        AnimeFilter.Header("NOTA: Los filtros no se aplican si se usa la búsqueda por texto"),
-        GenreFilter(),
-        StatusFilter(),
-        TypeFilter(),
-        SeasonFilter(),
-        YearFilter(),
-        StudioFilter(),
-    )
-
-    private class GenreFilter : AnimeFilter.Select<String>(
-        "Género",
-        arrayOf(
-            "Todos",
-            "Acción",
-            "Aventura",
-            "Comedia",
-            "Drama",
-            "Fantasía",
-        ),
-    )
-
-    private class StatusFilter : AnimeFilter.Select<String>(
-        "Estado",
-        arrayOf(
-            "Todos",
-            "Currently Airing",
-            "Finished Airing",
-            "Not yet aired",
-        ),
-    )
-
-    private class TypeFilter : AnimeFilter.Select<String>(
-        "Tipo",
-        arrayOf(
-            "Todos",
-            "TV",
-            "Movie",
-            "OVA",
-            "ONA",
-            "Special",
-        ),
-    )
-
-    private class SeasonFilter : AnimeFilter.Select<String>(
-        "Temporada",
-        arrayOf(
-            "Todos",
-            "Winter",
-            "Spring",
-            "Summer",
-            "Fall",
-        ),
-    )
-
-    private class YearFilter : AnimeFilter.Text("Año")
-
-    private class StudioFilter : AnimeFilter.Text("Estudio")
-
     override fun searchAnimeRequest(page: Int, query: String, filters: AnimeFilterList): Request {
-        val urlBuilder = "$baseUrl/discover/".toHttpUrlOrNull()!!.newBuilder()
+        val filterList = if (filters.isEmpty()) getFilterList() else filters
+        val genreFilter = filterList.find { it is GenreFilter } as? GenreFilter
+        val sortFilter = filterList.find { it is SortFilter } as? SortFilter
+        val statusFilter = filterList.find { it is StatusFilter } as? StatusFilter
+        val yearFilter = filterList.find { it is YearFilter } as? YearFilter
+        val languageFilter = filterList.find { it is LanguageFilter } as? LanguageFilter
 
-        urlBuilder.addQueryParameter("page", page.toString())
+        val queryString = mutableListOf<String>()
 
-        if (query.isNotBlank()) {
-            urlBuilder.addQueryParameter("q", query)
-        }
-
-        filters.forEach { filter ->
-            when (filter) {
-                is GenreFilter -> {
-                    if (filter.state != 0) {
-                        urlBuilder.addQueryParameter("genre", filter.values[filter.state])
-                    }
-                }
-                is StatusFilter -> {
-                    if (filter.state != 0) {
-                        urlBuilder.addQueryParameter("status", filter.values[filter.state].replace(" ", "+"))
-                    }
-                }
-                is TypeFilter -> {
-                    if (filter.state != 0) {
-                        urlBuilder.addQueryParameter("type", filter.values[filter.state])
-                    }
-                }
-                is SeasonFilter -> {
-                    if (filter.state != 0) {
-                        urlBuilder.addQueryParameter("season", filter.values[filter.state])
-                    }
-                }
-                is YearFilter -> {
-                    if (filter.state.isNotBlank()) {
-                        urlBuilder.addQueryParameter("year", filter.state)
-                    }
-                }
-                is StudioFilter -> {
-                    if (filter.state.isNotBlank()) {
-                        urlBuilder.addQueryParameter("studio", filter.state)
-                    }
-                }
-                else -> {}
+        genreFilter?.let {
+            val genrePart = it.toUriPart()
+            if (genrePart.isNotBlank()) {
+                queryString.add(genrePart)
             }
         }
 
-        return GET(urlBuilder.toString(), headers)
+        sortFilter?.let { if (it.state != 0) queryString.add(it.toUriPart()) }
+        statusFilter?.let { if (it.state != 0) queryString.add(it.toUriPart()) }
+        yearFilter?.let { if (it.state != 0) queryString.add(it.toUriPart()) }
+        languageFilter?.let { if (it.state != 0) queryString.add(it.toUriPart()) }
+
+        val url = when {
+            query.isNotBlank() -> "$baseUrl/discover/?page=$page&q=$query${if (queryString.isNotEmpty()) "&${queryString.joinToString("&")}" else ""}"
+            queryString.isNotEmpty() -> "$baseUrl/discover/?page=$page&${queryString.joinToString("&")}"
+            else -> "$baseUrl/discover/?page=$page"
+        }
+
+        return GET(url, headers)
     }
+
+    private open class UriPartFilter(displayName: String, val vals: Array<Pair<String, String>>) :
+        AnimeFilter.Select<String>(displayName, vals.map { it.first }.toTypedArray()) {
+        fun toUriPart() = vals[state].second
+    }
+
+    private class StatusFilter : UriPartFilter(
+        "Status",
+        arrayOf(
+            Pair("Any", ""),
+            Pair("Not yet aired", "status=Not+yet+aired"),
+            Pair("Currently Airing", "status=Currently+Airing"),
+            Pair("Finished Airing", "status=Finished+Airing"),
+        ),
+    )
+
+    private class YearFilter : UriPartFilter(
+        "Year",
+        arrayOf(
+            Pair("Any", ""),
+            Pair("2024", "year=2024"),
+            Pair("2023", "year=2023"),
+            Pair("2022", "year=2022"),
+        ),
+    )
+
+    private class LanguageFilter : UriPartFilter(
+        "Language",
+        arrayOf(
+            Pair("Both", ""),
+            Pair("Sub", "language=Sub"),
+            Pair("Dub", "language=Dub"),
+        ),
+    )
+
+    private class GenreFilter : CheckBoxFilterList(
+        "Genres",
+        arrayOf(
+            Pair("Action", "genreIncluded=Action"),
+            Pair("Adventure", "genreIncluded=Adventure"),
+            Pair("Comedy", "genreIncluded=Comedy"),
+            Pair("Drama", "genreIncluded=Drama"),
+            Pair("Ecchi", "genreIncluded=Ecchi"),
+            Pair("Fantasy", "genreIncluded=Fantasy"),
+            Pair("Harem", "genreIncluded=Harem"),
+            Pair("Historical", "genreIncluded=Historical"),
+            Pair("Horror", "genreIncluded=Horror"),
+            Pair("Magic", "genreIncluded=Magic"),
+            Pair("Martial Arts", "genreIncluded=Martial+Arts"),
+            Pair("Mecha", "genreIncluded=Mecha"),
+            Pair("Military", "genreIncluded=Military"),
+            Pair("Music", "genreIncluded=Music"),
+            Pair("Mystery", "genreIncluded=Mystery"),
+            Pair("Parody", "genreIncluded=Parody"),
+            Pair("Police", "genreIncluded=Police"),
+            Pair("Psychological", "genreIncluded=Psychological"),
+            Pair("Romance", "genreIncluded=Romance"),
+            Pair("Samurai", "genreIncluded=Samurai"),
+            Pair("School", "genreIncluded=School"),
+            Pair("Sci-Fi", "genreIncluded=Sci-Fi"),
+            Pair("Seinen", "genreIncluded=Seinen"),
+            Pair("Shoujo", "genreIncluded=Shoujo"),
+            Pair("Shoujo Ai", "genreIncluded=Shoujo+Ai"),
+            Pair("Shounen", "genreIncluded=Shounen"),
+            Pair("Shounen Ai", "genreIncluded=Shounen+Ai"),
+            Pair("Slice of Life", "genreIncluded=Slice+of+Life"),
+            Pair("Space", "genreIncluded=Space"),
+            Pair("Sports", "genreIncluded=Sports"),
+            Pair("Super Power", "genreIncluded=Super+Power"),
+            Pair("Supernatural", "genreIncluded=Supernatural"),
+            Pair("Thriller", "genreIncluded=Thriller"),
+            Pair("Vampire", "genreIncluded=Vampire"),
+            Pair("Yaoi", "genreIncluded=Yaoi"),
+            Pair("Yuri", "genreIncluded=Yuri"),
+        ),
+    )
+
+    private open class CheckBoxFilterList(name: String, pairs: Array<Pair<String, String>>) :
+        AnimeFilter.Group<CheckBoxFilterList.CheckBoxVal>(name, pairs.map { CheckBoxVal(it.first, false, it.second) }) {
+
+        fun toUriPart(): String {
+            return state.filter { it.state }.joinToString("&") { it.uriPart }
+        }
+
+        private class CheckBoxVal(displayName: String, defaultState: Boolean, val uriPart: String) :
+            CheckBox(displayName, defaultState)
+    }
+
+    private class SortFilter : UriPartFilter(
+        "Sort By",
+        arrayOf(
+            Pair("Default", ""),
+            Pair("Newest Addition", "sort=Newest+Addition"),
+            Pair("Oldest Addition", "sort=Oldest+Addition"),
+            Pair("Alphabetical", "sort=Alphabetical"),
+            Pair("Rating", "sort=Rating"),
+            Pair("Views", "sort=Views"),
+        ),
+    )
+
+    override fun getFilterList(): AnimeFilterList = AnimeFilterList(
+        AnimeFilter.Header("Text search ignores filters"),
+        GenreFilter(),
+        SortFilter(),
+        StatusFilter(),
+        YearFilter(),
+        LanguageFilter(),
+    )
+
     override fun searchAnimeSelector(): String {
-        throw NotImplementedError("This method should not be called!")
+        return "div.cards-grid a.anime-meta"
     }
 
     override fun videoFromElement(element: Element): Video {
-        throw NotImplementedError("This method should not be called!")
+        throw UnsupportedOperationException()
     }
 
     override fun searchAnimeFromElement(element: Element): SAnime {
@@ -326,15 +358,15 @@ class YugenAnime : ParsedAnimeHttpSource() {
     }
 
     private fun fixTitle(title: String): String {
-        return title.replace("_", " ").capitalize()
+        return title.replace("_", " ")
     }
 
     override fun videoListSelector(): String {
-        TODO("Not yet implemented")
+        throw UnsupportedOperationException()
     }
 
     override fun videoUrlParse(document: Document): String {
-        TODO("Not yet implemented")
+        throw UnsupportedOperationException()
     }
 
     @Serializable
