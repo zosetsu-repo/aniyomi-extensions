@@ -121,7 +121,7 @@ class AnimeFlv : ConfigurableAnimeSource, ParsedAnimeHttpSource() {
                 "Stape" -> listOf(streamTapeExtractor.videoFromUrl(it.url ?: it.code)!!)
                 "Okru" -> okruExtractor.videosFromUrl(it.url ?: it.code)
                 "YourUpload" -> yourUploadExtractor.videoFromUrl(it.url ?: it.code, headers = headers)
-                "SW" -> streamWishExtractor.videosFromUrl(it.url ?: it.code, videoNameGen = {"StreamWish:$it"})
+                "SW" -> streamWishExtractor.videosFromUrl(it.url ?: it.code, videoNameGen = { "StreamWish:$it" })
                 else -> universalExtractor.videosFromUrl(it.url ?: it.code, headers)
             }
         }
