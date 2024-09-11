@@ -3,7 +3,7 @@ ext {
     extClass = '.RineCloud'
     themePkg = 'animestream'
     baseUrl = 'https://rine.cloud'
-    overrideVersionCode = 10
+    overrideVersionCode = 11
 }
 
 apply from: "$rootDir/common.gradle"
