@@ -66,7 +66,6 @@ class UniversalExtractor(private val client: OkHttpClient) {
             webView?.destroy()
             webView = null
         }
-        Log.d("UniversalExtractor", "Result URL: $resultUrl from $origRequestUrl host: $host")
         return when {
             "m3u8" in resultUrl -> playlistUtils.extractFromHls(resultUrl, origRequestUrl, videoNameGen = { "$prefix - $host: $it" })
             "mpd" in resultUrl -> playlistUtils.extractFromDash(resultUrl, { it -> "$prefix - $host: $it" }, referer = origRequestUrl)
