@@ -283,7 +283,9 @@ class AnimeMovil : ConfigurableAnimeSource, AnimeHttpSource() {
                     UniversalExtractor(client).videosFromUrl(url, headers).also(videoList::addAll)
                 }
             }
-        } catch (_: Exception) {}
+        } catch (_: Exception) {
+            Log.e("AnimeMovil", "Error: Server not supported")
+        }
         return videoList
     }
 
