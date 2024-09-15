@@ -22,10 +22,10 @@ import eu.kanade.tachiyomi.lib.streamhidevidextractor.StreamHideVidExtractor
 import eu.kanade.tachiyomi.lib.streamlareextractor.StreamlareExtractor
 import eu.kanade.tachiyomi.lib.streamsilkextractor.StreamSilkExtractor
 import eu.kanade.tachiyomi.lib.streamtapeextractor.StreamTapeExtractor
-import eu.kanade.tachiyomi.lib.vidguardextractor.VidGuardExtractor
 import eu.kanade.tachiyomi.lib.streamwishextractor.StreamWishExtractor
 import eu.kanade.tachiyomi.lib.upstreamextractor.UpstreamExtractor
 import eu.kanade.tachiyomi.lib.uqloadextractor.UqloadExtractor
+import eu.kanade.tachiyomi.lib.vidguardextractor.VidGuardExtractor
 import eu.kanade.tachiyomi.lib.voeextractor.VoeExtractor
 import eu.kanade.tachiyomi.lib.youruploadextractor.YourUploadExtractor
 import eu.kanade.tachiyomi.network.GET

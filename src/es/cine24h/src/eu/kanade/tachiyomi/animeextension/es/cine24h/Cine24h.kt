@@ -14,8 +14,8 @@ import eu.kanade.tachiyomi.animesource.model.Video
 import eu.kanade.tachiyomi.animesource.online.AnimeHttpSource
 import eu.kanade.tachiyomi.lib.doodextractor.DoodExtractor
 import eu.kanade.tachiyomi.lib.fastreamextractor.FastreamExtractor
-import eu.kanade.tachiyomi.lib.vidguardextractor.VidGuardExtractor
 import eu.kanade.tachiyomi.lib.filemoonextractor.FilemoonExtractor
+import eu.kanade.tachiyomi.lib.vidguardextractor.VidGuardExtractor
 import eu.kanade.tachiyomi.lib.voeextractor.VoeExtractor
 import eu.kanade.tachiyomi.network.GET
 import eu.kanade.tachiyomi.util.asJsoup
