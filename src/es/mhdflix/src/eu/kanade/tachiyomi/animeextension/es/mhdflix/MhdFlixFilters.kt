@@ -4,7 +4,7 @@ import eu.kanade.tachiyomi.animesource.model.AnimeFilter
 import eu.kanade.tachiyomi.animesource.model.AnimeFilterList
 
 object MhdFlixFilters {
-    open class QueryPartFilter(displayName: String, val vals: Array<Pair<String, String>>) : AnimeFilter.Select<String>(
+    open class QueryPartFilter(displayName: String, private val vals: Array<Pair<String, String>>) : AnimeFilter.Select<String>(
         displayName,
         vals.map { it.first }.toTypedArray(),
     ) {
@@ -18,7 +18,8 @@ object MhdFlixFilters {
     private fun String.changePrefix() = this.takeIf { it.startsWith("&") }?.let { this.replaceFirst("&", "?") } ?: run { this }
 
     data class FilterSearchParams(val path: String = "", val queryParams: String = "") {
-        fun getFullUrl() = "$path$queryParams".changePrefix()
+        fun getFullUrl() = path.changePrefix()
+        fun query() = queryParams
     }
 
     internal fun getSearchParameters(filters: AnimeFilterList): FilterSearchParams {
@@ -55,8 +56,8 @@ object MhdFlixFilters {
     private object AnimeFlvFiltersData {
         val TYPES = arrayOf(
             Pair("Seleccione un tipo", ""),
-            Pair("Películas", "movies"),
-            Pair("Series", "series"),
+            Pair("Películas", "/?type=movies"),
+            Pair("Series", "/?type=series"),
         )
         val GENERAL = arrayOf(
             Pair("Seleccione un tipo", ""),

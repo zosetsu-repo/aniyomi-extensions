@@ -103,7 +103,7 @@ open class MhdFlix : AnimeHttpSource(), ConfigurableAnimeSource {
         val params = MhdFlixFilters.getSearchParameters(filters)
         return when {
             query.isNotBlank() -> GET("$baseUrl/?s=$query&page=$page")
-            params.path.isNotEmpty() -> GET("$baseUrl${params.getFullUrl()}/page/$page")
+            params.path.isNotEmpty() -> GET("$baseUrl${params.getFullUrl()}/page/$page/${params.query()}")
             else -> popularAnimeRequest(page)
         }
     }
