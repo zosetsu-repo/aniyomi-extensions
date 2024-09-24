@@ -22,6 +22,7 @@ import eu.kanade.tachiyomi.lib.vidhideextractor.VidHideExtractor
 import eu.kanade.tachiyomi.lib.voeextractor.VoeExtractor
 import eu.kanade.tachiyomi.network.GET
 import eu.kanade.tachiyomi.util.asJsoup
+import okhttp3.FormBody
 import okhttp3.Request
 import okhttp3.Response
 import org.json.JSONArray
@@ -133,8 +134,10 @@ open class MhdFlix : AnimeHttpSource(), ConfigurableAnimeSource {
 
     override fun episodeListParse(response: Response): List<SEpisode> {
         val document = Jsoup.parse(response.body.string())
-        val episodeElements = document.select("section.episodes ul#episode_by_temp li")
+        val referer = response.request.url.toString()
+        val allEpisodes = mutableListOf<SEpisode>()
 
+        val episodeElements = document.select("section.episodes ul#episode_by_temp li")
         if (episodeElements.isEmpty()) {
             return listOf(
                 SEpisode.create().apply {
@@ -145,20 +148,51 @@ open class MhdFlix : AnimeHttpSource(), ConfigurableAnimeSource {
             )
         }
 
-        return episodeElements.map { element ->
-            val episode = SEpisode.create()
-            Log.d("MhdFlix", "Element: $element")
-            val url = element.selectFirst("a.lnk-blk")?.attr("href") ?: ""
-            val title = element.selectFirst("header.entry-header h2.entry-title")?.text() ?: "Episodio Desconocido"
-            val episodeNumber = element.selectFirst("span.num-epi")?.text()?.substringAfter("x")?.toFloatOrNull() ?: 0F
+        val seasonElements = document.select("ul.aa-cnt.sub-menu li.sel-temp a")
+            .sortedBy { it.attr("data-season") }
 
-            episode.apply {
-                setUrlWithoutDomain(url)
-                Log.d("MhdFlix", "Episode: $url")
-                name = title
-                episode_number = episodeNumber
+        for (season in seasonElements) {
+            val post = season.attr("data-post")
+            val seasonNumber = season.attr("data-season")
+
+            val formBody = FormBody.Builder()
+                .add("action", "action_select_season")
+                .add("season", seasonNumber)
+                .add("post", post)
+                .build()
+
+            val request = Request.Builder()
+                .url("https://ww2.mhdflix.com/wp-admin/admin-ajax.php")
+                .post(formBody)
+                .header("Origin", baseUrl)
+                .header("Referer", referer)
+                .header("Content-Type", "application/x-www-form-urlencoded")
+                .build()
+
+            val detailResponse = client.newCall(request).execute()
+
+            if (detailResponse.isSuccessful) {
+                val detailDocument = Jsoup.parse(detailResponse.body.string())
+                val episodeElements = detailDocument.select("article.post.episodes")
+
+                episodeElements.forEach { element ->
+                    val episode = SEpisode.create().apply {
+                        val url = element.selectFirst("a.lnk-blk")?.attr("href") ?: ""
+                        val title = element.selectFirst("header.entry-header h2.entry-title")?.text() ?: "Episodio Desconocido"
+                        val episodeNumber = element.selectFirst("span.num-epi")?.text()?.substringBefore("x")?.toFloatOrNull() ?: 0F
+
+                        setUrlWithoutDomain(url)
+                        name = title
+                        episode_number = episodeNumber
+                    }
+                    allEpisodes.add(episode)
+                }
+            } else {
+                Log.e("MhdFlix", "Error en la solicitud de detalles de la temporada: ${detailResponse.code}")
             }
-        }.sortedByDescending { it.episode_number }
+        }
+
+        return allEpisodes.sortedByDescending { it.episode_number }
     }
 
     private fun fetchUrls(text: String?): List<String> {
