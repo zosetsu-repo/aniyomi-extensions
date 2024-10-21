@@ -73,6 +73,7 @@ class SoloLatino : DooPlay(
                 setUrlWithoutDomain(doc.location())
                 episode_number = 1F
                 name = episodeMovieText
+                date_upload = doc.selectFirst("span.date")?.text()?.toDate() ?: 0L
             }.let(::listOf)
         } else {
             seasonList.flatMap(::getSeasonEpisodes).reversed()
