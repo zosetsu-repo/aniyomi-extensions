@@ -32,6 +32,8 @@ import org.jsoup.nodes.Document
 import org.jsoup.nodes.Element
 import java.net.HttpURLConnection
 import java.net.URL
+import java.text.SimpleDateFormat
+import java.util.Locale
 
 class SoloLatino : DooPlay(
     "es",
@@ -375,7 +377,7 @@ class SoloLatino : DooPlay(
                         else -> "tendencias"
                     },
 
-                )
+                    )
 
                 if (params.isInverted) append("&orden=asc")
             }
@@ -468,7 +470,16 @@ class SoloLatino : DooPlay(
     }
 
     // ============================= Utilities ==============================
-    override fun String.toDate() = 0L
+
+    override fun String.toDate(): Long {
+        return try {
+            val dateFormat = SimpleDateFormat("MMM. dd, yyyy", Locale.ENGLISH)
+            val date = dateFormat.parse(this)
+            date?.time ?: 0L
+        } catch (e: Exception) {
+            0L
+        }
+    }
 
     override fun List<Video>.sort(): List<Video> {
         val quality = preferences.getString(prefQualityKey, prefQualityDefault)!!
