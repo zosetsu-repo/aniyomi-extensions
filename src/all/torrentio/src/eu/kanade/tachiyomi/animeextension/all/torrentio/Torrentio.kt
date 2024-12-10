@@ -649,7 +649,7 @@ class Torrentio : ConfigurableAnimeSource, AnimeHttpSource() {
             "seeders",
             "size",
 
-            )
+        )
 
         // Provider
         private const val PREF_PROVIDER_KEY = "provider_selection"
@@ -860,7 +860,7 @@ class Torrentio : ConfigurableAnimeSource, AnimeHttpSource() {
 
             "thai",
 
-            )
+        )
 
         private val PREF_LANG_DEFAULT = setOf<String>()
 
@@ -896,7 +896,7 @@ class Torrentio : ConfigurableAnimeSource, AnimeHttpSource() {
         private val PREF_JW_LANG_VALUES = arrayOf(
             "ar", "az", "be", "bg", "bs", "ca", "cs", "de", "el", "en", "en-US", "es", "es-ES", "es-LA", "et", "fi", "fr", "fr-CA", "he", "hr", "hu", "is", "it", "ja", "ko", "lt", "lv", "mk", "mt", "pl", "pt", "pt-PT", "pt-BR", "ro", "ru", "sk", "sl", "sq", "sr", "sv", "sw", "tr", "uk", "ur", "zh",
 
-            )
+        )
         private const val PREF_JW_LANG_DEFAULT = "en"
     }
 }

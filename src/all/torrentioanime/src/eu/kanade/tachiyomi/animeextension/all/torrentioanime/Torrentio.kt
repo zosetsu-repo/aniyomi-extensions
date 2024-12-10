@@ -622,7 +622,7 @@ class Torrentio : ConfigurableAnimeSource, AnimeHttpSource() {
             "seeders",
             "size",
 
-            )
+        )
 
         // Provider
         private const val PREF_PROVIDER_KEY = "provider_selection"
@@ -833,7 +833,7 @@ class Torrentio : ConfigurableAnimeSource, AnimeHttpSource() {
 
             "thai",
 
-            )
+        )
 
         private val PREF_LANG_DEFAULT = setOf<String>()
 
