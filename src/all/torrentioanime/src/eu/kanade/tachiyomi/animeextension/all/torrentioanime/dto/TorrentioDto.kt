@@ -154,4 +154,5 @@ data class EpisodeVideo(
     val episode: Int? = null,
     val released: String? = null,
     val title: String? = null,
+    val thumbnail: String? = null,
 )
