@@ -48,15 +48,12 @@ jobs:
           git_user_signingkey: true
           git_commit_gpgsign: true
 
-        # This step is going to commit, but this will not trigger another workflow.
-      - name: Bump extensions that uses a modified lib
-        if: steps.modified-libs.outputs.any_changed == 'true'
-        run: |
-          chmod +x ./.github/scripts/bump-versions.py
-          ./.github/scripts/bump-versions.py ${{ steps.modified-libs.outputs.all_changed_files }}
-
-      - name: Validate Gradle Wrapper
-        uses: gradle/wrapper-validation-action@a494d935f4b56874c4a5a87d19af7afcf3a163d0 # v2
+      #   # This step is going to commit, but this will not trigger another workflow.
+      # - name: Bump extensions that uses a modified lib
+      #   if: steps.modified-libs.outputs.any_changed == 'true'
+      #   run: |
+      #     chmod +x ./.github/scripts/bump-versions.py
+      #     ./.github/scripts/bump-versions.py ${{ steps.modified-libs.outputs.all_changed_files }}
 
       - name: Get number of modules
         run: |
@@ -168,10 +165,27 @@ jobs:
         run: |
           rsync -a --delete --exclude .git --exclude .gitignore main/repo/ repo --exclude README.md --exclude repo.json
 
+      - name: Import GPG key
+        id: import-gpg
+        uses: crazy-max/ghaction-import-gpg@cb9bde2e2525e640591a934b1fd28eef1dcaf5e5 # v6
+        with:
+          workdir: repo
+          gpg_private_key: ${{ secrets.GPG_PRIVATE_KEY }}
+          passphrase: ${{ secrets.PASSPHRASE }}
+          git_user_signingkey: true
+          git_commit_gpgsign: true
+
+      - name: GPG user IDs
+        run: |
+          echo "fingerprint: ${{ steps.import-gpg.outputs.fingerprint }}"
+          echo "keyid:       ${{ steps.import-gpg.outputs.keyid }}"
+          echo "name:        ${{ steps.import-gpg.outputs.name }}"
+          echo "email:       ${{ steps.import-gpg.outputs.email }}"
+
       - name: Deploy repo
         uses: EndBug/add-and-commit@v9
         with:
           message: "Update extensions repo"
           cwd: "./repo"
-          committer_name: Aniku-Bot
-          committer_email: Aniku-Bot@users.noreply.github.com
+          committer_name: ${{ steps.import-gpg.outputs.name }}
+          committer_email: ${{ steps.import-gpg.outputs.email }}
