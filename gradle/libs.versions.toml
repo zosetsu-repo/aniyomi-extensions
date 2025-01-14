@@ -1,6 +1,6 @@
 [versions]
 agp_version = "8.6.1"
-coroutines_version = "1.7.1"
+coroutines_version = "1.10.1"
 kotlin_version = "1.9.25"
 serialization_version = "1.5.1"
 jsunpacker_version = "1.0.2"
