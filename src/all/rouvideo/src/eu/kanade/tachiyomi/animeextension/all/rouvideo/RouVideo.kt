@@ -2,6 +2,7 @@ package eu.kanade.tachiyomi.animeextension.all.rouvideo
 
 import android.app.Application
 import android.content.SharedPreferences
+import android.util.Log
 import androidx.preference.ListPreference
 import androidx.preference.PreferenceScreen
 import eu.kanade.tachiyomi.animesource.ConfigurableAnimeSource
@@ -25,6 +26,8 @@ import org.jsoup.nodes.Element
 import uy.kohesive.injekt.Injekt
 import uy.kohesive.injekt.api.get
 import uy.kohesive.injekt.injectLazy
+import java.text.SimpleDateFormat
+import java.util.Locale
 
 class RouVideo : ConfigurableAnimeSource, ParsedAnimeHttpSource() {
 
@@ -64,13 +67,15 @@ class RouVideo : ConfigurableAnimeSource, ParsedAnimeHttpSource() {
             addQueryParameter("order", SORT_LIKE_KEY)
             addQueryParameter("page", page.toString())
         }.build(),
-        apiHeaders,
+        docHeaders,
     )
 
     override fun popularAnimeSelector() = "div.my-auto:has(a[href*=\"/$VIDEO_SLUG/\"])"
 
     override fun popularAnimeFromElement(element: Element): SAnime {
         val url = element.selectFirst("a[href*=\"/$VIDEO_SLUG/\"]")!!.attr("href")
+            .removeSuffix("/")
+            .substringAfterLast('/')
         val category = element.select("a[href*=\"/$CATEGORY_SLUG/\"]").attr("href")
             .removeSuffix("/")
             .substringAfterLast('/')
@@ -98,7 +103,7 @@ class RouVideo : ConfigurableAnimeSource, ParsedAnimeHttpSource() {
             addQueryParameter("order", SORT_LATEST_KEY)
             addQueryParameter("page", page.toString())
         }.build(),
-        apiHeaders,
+        docHeaders,
     )
 
     override fun latestUpdatesSelector() = popularAnimeSelector()
@@ -120,14 +125,10 @@ class RouVideo : ConfigurableAnimeSource, ParsedAnimeHttpSource() {
             else -> "$apiUrl/?title=$query"
         }
 
-        return GET(url, headers = apiHeaders)
+        return GET(url, docHeaders)
     }
 
     override fun searchAnimeSelector(): String {
-        TODO("Not yet implemented")
-    }
-
-    override fun searchAnimeFromElement(element: Element): SAnime {
         TODO("Not yet implemented")
     }
 
@@ -135,7 +136,9 @@ class RouVideo : ConfigurableAnimeSource, ParsedAnimeHttpSource() {
         TODO("Not yet implemented")
     }
 
-    override fun searchAnimeParse(response: Response): AnimesPage = popularAnimeParse(response)
+    override fun searchAnimeFromElement(element: Element): SAnime {
+        TODO("Not yet implemented")
+    }
 
     // ============================== Filters ===============================
 
@@ -165,48 +168,64 @@ class RouVideo : ConfigurableAnimeSource, ParsedAnimeHttpSource() {
     // =========================== Anime Details ============================
 
     override fun getAnimeUrl(anime: SAnime): String {
-        return anime.url
+        Log.e("RouVideo", "Anime URL: $baseUrl/$VIDEO_SLUG/${anime.url}")
+        return "$baseUrl/$VIDEO_SLUG/${anime.url}"
     }
 
     override fun animeDetailsRequest(anime: SAnime): Request {
-        val data = json.decodeFromString<LinkData>(anime.url)
-        return GET("$baseUrl/anime/${data.slug}", headers = docHeaders)
+        return GET(getAnimeUrl(anime), docHeaders)
     }
 
-    override fun animeDetailsParse(response: Response): SAnime {
-        val document = response.asJsoup()
-        val data = document.selectFirst("script#__NEXT_DATA__")?.data() ?: return SAnime.create()
+//    override fun animeDetailsRequest(anime: SAnime): Request {
+//        val data = json.decodeFromString<LinkData>(anime.url)
+//        return GET("$baseUrl/anime/${data.slug}", headers = docHeaders)
+//    }
 
-        return json.decodeFromString<AnimeDetails>(data).props.pageProps.data.toSAnime()
-    }
+//    override fun animeDetailsParse(response: Response): SAnime {
+//        val document = response.asJsoup()
+//        val data = document.selectFirst("script#__NEXT_DATA__")?.data() ?: return SAnime.create()
+//
+//        return json.decodeFromString<AnimeDetails>(data).props.pageProps.data.toSAnime()
+//    }
 
     override fun animeDetailsParse(document: Document): SAnime {
-        TODO("Not yet implemented")
+        val data = document.selectFirst("script#__NEXT_DATA__")?.data() ?: return SAnime.create()
+
+        return json.decodeFromString<AnimeDetails>(data).props.pageProps.video.toSAnime()
     }
 
     // ============================== Episodes ==============================
 
     override fun episodeListRequest(anime: SAnime): Request {
-        val data = json.decodeFromString<LinkData>(anime.url)
-        return GET("$apiUrl/anime/${data.id}/episode", headers = apiHeaders)
-    }
-
-    override fun episodeListSelector(): String {
-        TODO("Not yet implemented")
+        return GET("$baseUrl/$VIDEO_SLUG/${anime.url}", docHeaders)
     }
 
     override fun episodeListParse(response: Response): List<SEpisode> {
-        val data = response.parseAs<EpisodeListResponse>()
-        return data.data.map { it.toSEpisode() }.reversed()
+        val document = response.asJsoup()
+        val data = document.selectFirst("script#__NEXT_DATA__")?.data() ?: return emptyList()
+        val video = json.decodeFromString<AnimeDetails>(data).props.pageProps.video
+
+        return listOf(
+            SEpisode.create().apply {
+                name = video.id
+                url = video.id
+                date_upload = video.createdAt.toDate()
+                episode_number = 1f
+            },
+        )
     }
 
-    override fun episodeFromElement(element: Element): SEpisode {
-        TODO("Not yet implemented")
-    }
+    override fun episodeListSelector(): String = throw UnsupportedOperationException()
+
+    override fun episodeFromElement(element: Element): SEpisode = throw UnsupportedOperationException()
 
     // ============================ Video Links =============================
 
-    override fun videoListRequest(episode: SEpisode): Request = GET(baseUrl + episode.url, headers = docHeaders)
+    override fun getEpisodeUrl(episode: SEpisode): String {
+        return "$baseUrl/$VIDEO_SLUG/${episode.url}"
+    }
+
+    override fun videoListRequest(episode: SEpisode): Request = GET(getEpisodeUrl(episode), docHeaders)
     override fun videoListSelector(): String {
         TODO("Not yet implemented")
     }
@@ -283,6 +302,14 @@ class RouVideo : ConfigurableAnimeSource, ParsedAnimeHttpSource() {
         private const val SORT_LATEST_KEY = "createdAt"
         private const val SORT_LIKE_KEY = "likeCount"
         private const val SORT_VIEW_KEY = "viewCount"
+
+        private val DATE_FORMATTER by lazy {
+            SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.ENGLISH)
+        }
+
+        private fun String.toDate(): Long {
+            return runCatching { DATE_FORMATTER.parse(trim())?.time }.getOrNull() ?: 0L
+        }
     }
     // ============================== Settings ==============================
 
