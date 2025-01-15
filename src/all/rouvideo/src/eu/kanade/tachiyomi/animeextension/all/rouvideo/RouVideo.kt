@@ -103,15 +103,15 @@ class RouVideo : ConfigurableAnimeSource, AnimeHttpSource() {
     // =============================== Search ===============================
 
     override fun searchAnimeRequest(page: Int, query: String, filters: AnimeFilterList): Request {
-        val filterList = if (filters.isEmpty()) getFilterList() else filters
-        val genreFilter = filterList.find { it is GenreFilter } as GenreFilter
-
-        val url = when {
-            genreFilter.state != 0 -> apiUrl + genreFilter.toUriPart()
-            else -> "$apiUrl/?title=$query"
-        }
-
-        return GET(url, docHeaders)
+        return GET(
+            baseUrl.toHttpUrl().newBuilder().apply {
+                addPathSegment("search")
+                addQueryParameter("q", query)
+                addQueryParameter("page", page.toString())
+                // addQueryParameter("t", "tag"), empty for all
+            }.build(),
+            docHeaders,
+        )
     }
 
     override fun searchAnimeParse(response: Response): AnimesPage = popularAnimeParse(response)
@@ -155,7 +155,7 @@ class RouVideo : ConfigurableAnimeSource, AnimeHttpSource() {
                 val data = document.selectFirst("script#__NEXT_DATA__")?.data() ?: return SAnime.create()
                 json.decodeFromString<RouVideoDto.VideoDetails>(data).props.pageProps.video.toSAnime()
                     .apply {
-                        // RelatedVideos doesn't have likeCount while AnimeDetails doesn't have resolution
+                        // Search & RelatedVideos doesn't have likeCount while AnimeDetails doesn't have resolution
                         val resolutionSet = description?.matches(resolutionRegex) ?: false
                         if (!resolutionSet && !resolution.isNullOrBlank()) {
                             description = "$resolution\n$description"

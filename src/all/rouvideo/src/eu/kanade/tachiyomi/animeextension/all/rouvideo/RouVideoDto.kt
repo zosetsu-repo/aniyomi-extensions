@@ -19,13 +19,15 @@ internal object RouVideoDto {
         ) {
             @Serializable
             data class PagePropsObject(
-                val order: String, // createdAt...
+                val order: String?, // createdAt...
                 val videos: List<Video>,
                 val pageNum: Int,
                 val totalPage: Int,
                 val totalVideoNum: Int,
-                val tagsForCNAV: List<Tag>, // 國產AV
-                val tags91: List<Tag>, // 探花
+                val tagsForCNAV: List<Tag>?, // 國產AV
+                val tags91: List<Tag>?, // 探花
+                val tagsOF: List<Tag>?, // OnlyFans, only in tag browse
+                val hotSearches: List<String>?, // only in Search
             )
         }
     }
@@ -57,7 +59,7 @@ internal object RouVideoDto {
         val tags: List<String>,
         val createdAt: String, // "2025-01-14T23:18:27.933Z"
         val viewCount: Int,
-        val likeCount: Int?, // not available in relatedVideos
+        val likeCount: Int?, // not available in search & relatedVideos
         val duration: Float, // in seconds
         val coverImageUrl: String,
         val nameZh: String?,
