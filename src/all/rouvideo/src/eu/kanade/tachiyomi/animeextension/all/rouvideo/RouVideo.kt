@@ -2,7 +2,6 @@ package eu.kanade.tachiyomi.animeextension.all.rouvideo
 
 import android.app.Application
 import android.content.SharedPreferences
-import android.util.Log
 import androidx.preference.ListPreference
 import androidx.preference.PreferenceScreen
 import eu.kanade.tachiyomi.animesource.ConfigurableAnimeSource
@@ -11,12 +10,11 @@ import eu.kanade.tachiyomi.animesource.model.AnimeFilterList
 import eu.kanade.tachiyomi.animesource.model.AnimesPage
 import eu.kanade.tachiyomi.animesource.model.SAnime
 import eu.kanade.tachiyomi.animesource.model.SEpisode
-import eu.kanade.tachiyomi.animesource.model.Track
 import eu.kanade.tachiyomi.animesource.model.Video
 import eu.kanade.tachiyomi.animesource.online.ParsedAnimeHttpSource
+import eu.kanade.tachiyomi.lib.playlistutils.PlaylistUtils
 import eu.kanade.tachiyomi.network.GET
 import eu.kanade.tachiyomi.util.asJsoup
-import eu.kanade.tachiyomi.util.parseAs
 import kotlinx.serialization.json.Json
 import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.Request
@@ -58,6 +56,16 @@ class RouVideo : ConfigurableAnimeSource, ParsedAnimeHttpSource() {
         add("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8")
         add("Host", baseUrl.toHttpUrl().host)
     }.build()
+
+    private val videoHeaders by lazy {
+        headers.newBuilder().apply {
+            add("Accept", "video/webm,video/ogg,video/*;q=0.9,application/ogg;q=0.7,audio/*;q=0.6,*/*;q=0.5")
+            add("Host", apiUrl.toHttpUrl().host)
+            add("Referer", "$baseUrl/")
+        }.build()
+    }
+
+    private val playlistUtils by lazy { PlaylistUtils(client) }
 
     // ============================== Popular ===============================
 
@@ -167,14 +175,9 @@ class RouVideo : ConfigurableAnimeSource, ParsedAnimeHttpSource() {
 
     // =========================== Anime Details ============================
 
-    override fun getAnimeUrl(anime: SAnime): String {
-        Log.e("RouVideo", "Anime URL: $baseUrl/$VIDEO_SLUG/${anime.url}")
-        return "$baseUrl/$VIDEO_SLUG/${anime.url}"
-    }
+    override fun getAnimeUrl(anime: SAnime): String = "$baseUrl/$VIDEO_SLUG/${anime.url}"
 
-    override fun animeDetailsRequest(anime: SAnime): Request {
-        return GET(getAnimeUrl(anime), docHeaders)
-    }
+    override fun animeDetailsRequest(anime: SAnime) = GET(getAnimeUrl(anime), docHeaders)
 
 //    override fun animeDetailsRequest(anime: SAnime): Request {
 //        val data = json.decodeFromString<LinkData>(anime.url)
@@ -191,7 +194,7 @@ class RouVideo : ConfigurableAnimeSource, ParsedAnimeHttpSource() {
     override fun animeDetailsParse(document: Document): SAnime {
         val data = document.selectFirst("script#__NEXT_DATA__")?.data() ?: return SAnime.create()
 
-        return json.decodeFromString<AnimeDetails>(data).props.pageProps.video.toSAnime()
+        return json.decodeFromString<RouVideoDto.VideoDetails>(data).props.pageProps.video.toSAnime()
     }
 
     // ============================== Episodes ==============================
@@ -203,7 +206,7 @@ class RouVideo : ConfigurableAnimeSource, ParsedAnimeHttpSource() {
     override fun episodeListParse(response: Response): List<SEpisode> {
         val document = response.asJsoup()
         val data = document.selectFirst("script#__NEXT_DATA__")?.data() ?: return emptyList()
-        val video = json.decodeFromString<AnimeDetails>(data).props.pageProps.video
+        val video = json.decodeFromString<RouVideoDto.VideoDetails>(data).props.pageProps.video
 
         return listOf(
             SEpisode.create().apply {
@@ -219,65 +222,27 @@ class RouVideo : ConfigurableAnimeSource, ParsedAnimeHttpSource() {
 
     override fun episodeFromElement(element: Element): SEpisode = throw UnsupportedOperationException()
 
+    override fun getEpisodeUrl(episode: SEpisode) = "$baseUrl/$VIDEO_SLUG/${episode.url}"
+
     // ============================ Video Links =============================
 
-    override fun getEpisodeUrl(episode: SEpisode): String {
-        return "$baseUrl/$VIDEO_SLUG/${episode.url}"
-    }
-
-    override fun videoListRequest(episode: SEpisode): Request = GET(getEpisodeUrl(episode), docHeaders)
-    override fun videoListSelector(): String {
-        TODO("Not yet implemented")
-    }
-
-    override fun videoUrlParse(document: Document): String {
-        TODO("Not yet implemented")
-    }
-
-    override fun videoFromElement(element: Element): Video {
-        TODO("Not yet implemented")
-    }
+    override fun videoListRequest(episode: SEpisode) = GET("$apiUrl/$VIDEO_SLUG/${episode.url}", apiHeaders)
 
     override fun videoListParse(response: Response): List<Video> {
-        val document = response.asJsoup()
-        val data = json.decodeFromString<VideoData>(
-            document.selectFirst("script#__NEXT_DATA__")!!.data(),
-        ).props.pageProps
+        val jsonStr = response.body.string()
+        val data = json.decodeFromString<RouVideoDto.VideoData>(jsonStr).video
 
-        val subtitleList = data.subtitles?.map {
-            Track(it.src, it.label)
-        } ?: emptyList()
-
-        val videoListUrl = apiUrl.toHttpUrl().newBuilder().apply {
-            addPathSegment("storage")
-            addPathSegment(data.animeData.title)
-            addPathSegment(data.episode.number)
-        }.build().toString()
-
-        val videoObjectList = client.newCall(
-            GET(videoListUrl, headers = apiHeaders),
-        ).execute().parseAs<VideoList>()
-
-        if (videoObjectList.directUrl == null) {
-            throw Exception(videoObjectList.message ?: "Videos not found")
-        }
-
-        val videoHeaders = headers.newBuilder().apply {
-            add("Accept", "video/webm,video/ogg,video/*;q=0.9,application/ogg;q=0.7,audio/*;q=0.6,*/*;q=0.5")
-            add("Host", apiUrl.toHttpUrl().host)
-            add("Referer", "$baseUrl/")
-        }.build()
-
-        return videoObjectList.directUrl.map {
-            val videoUrl = when {
-                it.src.startsWith("//") -> "https:${it.src}"
-                it.src.startsWith("/") -> apiUrl + it.src
-                else -> it.src
-            }
-
-            Video(videoUrl, it.label, videoUrl, headers = videoHeaders, subtitleTracks = subtitleList)
-        }.ifEmpty { throw Exception("Failed to fetch videos") }
+        return playlistUtils.extractFromHls(
+            playlistUrl = data.videoUrl,
+            referer = "$baseUrl/",
+        )
     }
+
+    override fun videoListSelector(): String = throw UnsupportedOperationException()
+
+    override fun videoFromElement(element: Element): Video = throw UnsupportedOperationException()
+
+    override fun videoUrlParse(document: Document): String = throw UnsupportedOperationException()
 
     // ============================= Utilities ==============================
 
