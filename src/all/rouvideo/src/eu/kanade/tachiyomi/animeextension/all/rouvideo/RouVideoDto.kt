@@ -4,42 +4,11 @@ import eu.kanade.tachiyomi.animesource.model.SAnime
 import eu.kanade.tachiyomi.animesource.model.SEpisode
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.encodeToString
-import kotlinx.serialization.json.Json
+import java.text.SimpleDateFormat
+import java.util.Locale
 import kotlin.time.Duration.Companion.seconds
 
 internal object RouVideoDto {
-    @Serializable
-    data class AnimeObject(
-        @SerialName("_id")
-        val id: String,
-        val title: String,
-        val link: String,
-        val posterImage: ImageObject,
-    ) {
-        @Serializable
-        data class ImageObject(
-            val original: String? = null,
-            val large: String? = null,
-            val medium: String? = null,
-            val small: String? = null,
-        )
-
-        fun toSAnime(json: Json): SAnime = SAnime.create().apply {
-            title = this@AnimeObject.title
-            thumbnail_url =
-                posterImage.original ?: posterImage.large ?: posterImage.medium ?: posterImage.small
-                    ?: ""
-            url = json.encodeToString(LinkData(slug = link, id = id))
-        }
-    }
-
-    @Serializable
-    data class LinkData(
-        val slug: String,
-        val id: String,
-    )
-
     @Serializable
     data class VideoList(
         val props: PropsObject,
@@ -85,30 +54,44 @@ internal object RouVideoDto {
         val name: String,
         val description: String?,
         val ref: String?,
-        val tags: List<String>?,
+        val tags: List<String>,
         val createdAt: String, // "2025-01-14T23:18:27.933Z"
         val viewCount: Int,
-        val likeCount: Int?,
+        val likeCount: Int?, // not available in relatedVideos
         val duration: Float, // in seconds
         val coverImageUrl: String,
-        val nameZh: String,
-        val tagZh: List<String?>?,
+        val nameZh: String?,
+        val tagZh: List<String>?,
+        val sources: List<Source>?, // not available in details
     ) {
         private val desc = StringBuilder().apply {
+            sources?.first()?.let { append("Resolution: ${it.resolution}p\n") }
+            append("Duration: ${formatDuration(duration.toInt())}\n")
             append("View: $viewCount")
             likeCount?.let { append(" - Like: $likeCount") }
-            append("\nDuration: ${formatDuration(duration.toInt())}")
             ref?.let { append("\nOrigin: $it") }
             description?.let { append("\n\n$description") }
         }.toString()
 
+        private val majorCategory = tags.first()
+
         fun toSAnime(): SAnime = SAnime.create().apply {
+            url = id
             title = name
             thumbnail_url = coverImageUrl
+            artist = majorCategory
+            author = majorCategory
             description = desc
-            genre = (listOfNotNull(code) + tags.orEmpty()).joinToString()
+            genre = (listOfNotNull(code) + tags).joinToString()
             status = SAnime.COMPLETED
-//                    initialized = true
+            initialized = true
+        }
+
+        fun toEpisode(): SEpisode = SEpisode.create().apply {
+            name = id
+            url = id
+            date_upload = createdAt.toDate()
+            episode_number = 1f
         }
     }
 
@@ -128,28 +111,7 @@ internal object RouVideoDto {
         val count: Int,
         val parent: String,
         val level: Int, // usually 0
-        val slug: String,
     )
-
-    @Serializable
-    data class EpisodeListResponse(
-        val data: List<EpisodeObject>,
-    ) {
-        @Serializable
-        data class EpisodeObject(
-            val uid: String,
-            val origin: String,
-            val number: String? = null,
-            val title: String? = null,
-        ) {
-            fun toSEpisode(): SEpisode = SEpisode.create().apply {
-                episode_number = number?.toFloatOrNull() ?: 1F
-                name =
-                    (number?.let { "Ep. $number" } ?: "Episode") + (title?.let { " - $it" } ?: "")
-                url = "/watch/$uid?origin=$origin"
-            }
-        }
-    }
 
     @Serializable
     data class VideoData(
@@ -160,5 +122,22 @@ internal object RouVideoDto {
             val thumbVTTUrl: String,
             val videoUrl: String,
         )
+    }
+
+    /* Not available in details */
+    @Serializable
+    data class Source(
+        val id: String?, // not available in relatedVideos
+        val videoId: String?, // not available in relatedVideos
+        val resolution: Int,
+        val folder: String?, // not available in relatedVideos
+    )
+
+    private val DATE_FORMATTER by lazy {
+        SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.ENGLISH)
+    }
+
+    private fun String.toDate(): Long {
+        return runCatching { DATE_FORMATTER.parse(trim())?.time }.getOrNull() ?: 0L
     }
 }
