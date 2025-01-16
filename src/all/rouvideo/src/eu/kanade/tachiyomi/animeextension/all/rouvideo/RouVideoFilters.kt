@@ -16,6 +16,7 @@ internal object RouVideoFilters {
             Pair("探花", "探花"),
             Pair("OnlyFans", "OnlyFans"),
             Pair("日本", "日本"),
+            Pair("大家正在看", "watching"),
         ),
     )
 

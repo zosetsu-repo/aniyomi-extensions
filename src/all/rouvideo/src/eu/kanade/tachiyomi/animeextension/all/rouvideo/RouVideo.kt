@@ -1,5 +1,6 @@
 package eu.kanade.tachiyomi.animeextension.all.rouvideo
 
+import eu.kanade.tachiyomi.animeextension.all.rouvideo.RouVideoDto.toAnimePage
 import eu.kanade.tachiyomi.animesource.model.AnimeFilter
 import eu.kanade.tachiyomi.animesource.model.AnimeFilterList
 import eu.kanade.tachiyomi.animesource.model.AnimesPage
@@ -69,12 +70,8 @@ class RouVideo : AnimeHttpSource() {
         val data = document.selectFirst("script#__NEXT_DATA__")?.data()
             ?: return AnimesPage(emptyList(), false)
 
-        return json.decodeFromString<RouVideoDto.VideoList>(data).props.pageProps.let {
-            AnimesPage(
-                it.videos.map { video -> video.toSAnime() },
-                it.pageNum < it.totalPage,
-            )
-        }
+        return json.decodeFromString<RouVideoDto.VideoList>(data)
+            .props.pageProps.toAnimePage()
     }
 
     // =============================== Latest ===============================
@@ -96,6 +93,10 @@ class RouVideo : AnimeHttpSource() {
         val categoryFilter = filters.filterIsInstance<RouVideoFilters.CategoryFilter>().firstOrNull()
         val sortFilter = filters.filterIsInstance<RouVideoFilters.SortFilter>().firstOrNull()
 
+        if (categoryFilter?.toUriPart() == "watching") {
+            return GET(watchingURL, apiHeaders)
+        }
+
         return GET(
             baseUrl.toHttpUrl().newBuilder().apply {
                 if (query.isBlank()) {
@@ -116,7 +117,17 @@ class RouVideo : AnimeHttpSource() {
         )
     }
 
-    override fun searchAnimeParse(response: Response): AnimesPage = popularAnimeParse(response)
+    override fun searchAnimeParse(response: Response): AnimesPage {
+        val request = response.request.url
+        if (request.toString().contains(watchingURL)) {
+            val jsonStr = response.body.string()
+            return json.decodeFromString<List<RouVideoDto.Video>>(jsonStr)
+                .toAnimePage()
+        }
+        return popularAnimeParse(response)
+    }
+
+    private val watchingURL by lazy { "$apiUrl/$VIDEO_SLUG/watching" }
 
     // ============================== Filters ===============================
 

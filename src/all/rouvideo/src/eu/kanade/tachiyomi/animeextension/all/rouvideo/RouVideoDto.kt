@@ -1,5 +1,6 @@
 package eu.kanade.tachiyomi.animeextension.all.rouvideo
 
+import eu.kanade.tachiyomi.animesource.model.AnimesPage
 import eu.kanade.tachiyomi.animesource.model.SAnime
 import eu.kanade.tachiyomi.animesource.model.SEpisode
 import kotlinx.serialization.SerialName
@@ -28,8 +29,22 @@ internal object RouVideoDto {
                 val tags91: List<Tag>?, // 探花
                 val tagsOF: List<Tag>?, // OnlyFans, only in tag browse
                 val hotSearches: List<String>?, // only in Search
-            )
+            ) {
+                fun toAnimePage(): AnimesPage {
+                    return AnimesPage(
+                        videos.map { video -> video.toSAnime() },
+                        pageNum < totalPage,
+                    )
+                }
+            }
         }
+    }
+
+    fun List<Video>.toAnimePage(): AnimesPage {
+        return AnimesPage(
+            map { video -> video.toSAnime() },
+            false,
+        )
     }
 
     @Serializable
