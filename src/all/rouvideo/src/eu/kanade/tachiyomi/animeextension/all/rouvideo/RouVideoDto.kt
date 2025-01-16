@@ -125,11 +125,11 @@ internal object RouVideoDto {
         val sources: List<Source>?, // not available in details
     ) {
         private val desc = StringBuilder().apply {
-            sources?.first()?.let { append("\uD83D\uDDA5 ${it.resolution}p\n") }
-            append("🕒 ${formatDuration(duration.toInt())}\n")
-            append("$viewCount \uD83D\uDC40")
-            likeCount?.let { append(" - $likeCount \uD83D\uDC4D") }
-            ref?.let { append("\n🌐 $it") }
+            sources?.first()?.let { append("Resolution: ${it.resolution}p\n") }
+            append("Duration: ${formatDuration(duration.toInt())}\n")
+            append("View: $viewCount")
+            likeCount?.let { append(" - Like: $likeCount") }
+            ref?.let { append("\nRef: $it") }
             description?.let { append("\n\n$description") }
         }.toString()
 

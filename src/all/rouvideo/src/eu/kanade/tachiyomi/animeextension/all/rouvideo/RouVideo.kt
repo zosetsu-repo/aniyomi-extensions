@@ -260,7 +260,7 @@ class RouVideo : AnimeHttpSource() {
     override fun getAnimeUrl(anime: SAnime): String = "$baseUrl/$VIDEO_SLUG/${anime.url}"
 
     override suspend fun getAnimeDetails(anime: SAnime): SAnime {
-        val resolutionRegex = "(🖥️ \\d+p)".toRegex()
+        val resolutionRegex = "(Resolution: \\d+p)".toRegex()
         val resolution = anime.description?.let { resolutionRegex.find(it) }
             ?.groupValues?.first()
         return client.newCall(animeDetailsRequest(anime))
