@@ -25,8 +25,8 @@ internal object RouVideoDto {
                 val pageNum: Int,
                 val totalPage: Int,
                 val totalVideoNum: Int,
-                val tagsForCNAV: List<Tag>?, // 國產AV
-                val tags91: List<Tag>?, // 探花
+                val tagsForCNAV: List<Tag>?,
+                val tags91: List<Tag>?,
                 val tagsOF: List<Tag>?, // OnlyFans, only in tag browse
                 val hotSearches: List<String>?, // only in Search
             ) {
@@ -34,6 +34,49 @@ internal object RouVideoDto {
                     return AnimesPage(
                         videos.map { video -> video.toSAnime() },
                         pageNum < totalPage,
+                    )
+                }
+            }
+        }
+    }
+
+    @Serializable
+    data class HotVideoList(
+        val props: PropsObject,
+    ) {
+        @Serializable
+        data class PropsObject(
+            val pageProps: PagePropsObject,
+        ) {
+            @Serializable
+            data class PagePropsObject(
+                val latestVideos: List<Video>,
+                val dailyHotCNAV: List<Video>,
+                val dailyHotSelfie: List<Video>,
+                val dailyHot91: List<Video>,
+                val dailyOnlyFans: List<Video>,
+                val dailyJV: List<Video>,
+                val hotCNAV: List<Video>,
+                val hotSelfie: List<Video>,
+                val hot91: List<Video>,
+            ) {
+                fun toAnimePage(): AnimesPage {
+                    return AnimesPage(
+                        listOf(
+                            latestVideos,
+                            dailyHotCNAV,
+                            dailyHotSelfie,
+                            dailyHot91,
+                            dailyOnlyFans,
+                            dailyJV,
+                            hotCNAV,
+                            hotSelfie,
+                            hot91,
+                        ).flatten()
+                            .sortedByDescending { it.viewCount }
+                            .associateBy { it.id }
+                            .map { (_, video) -> video.toSAnime() },
+                        false,
                     )
                 }
             }

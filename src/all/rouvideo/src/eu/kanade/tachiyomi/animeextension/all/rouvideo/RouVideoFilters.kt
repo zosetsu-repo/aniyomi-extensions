@@ -10,13 +10,14 @@ internal object RouVideoFilters {
     class CategoryFilter : UriPartFilter(
         "分類",
         arrayOf(
-            Pair("全部視頻", ""),
-            Pair("國產AV", "國產AV"),
-            Pair("自拍流出", "自拍流出"),
-            Pair("探花", "探花"),
+            Pair("精選", FEATURED),
+            Pair("大家正在看", WATCHING),
+            Pair("國產AV", "國產AV"), // ChineseAV
+            Pair("自拍流出", "自拍流出"), // Selfie leaked
+            Pair("探花", "探花"), // Tanhua (Flower exploration - Thám hoa - Check hàng)
             Pair("OnlyFans", "OnlyFans"),
-            Pair("日本", "日本"),
-            Pair("大家正在看", "watching"),
+            Pair("日本", "日本"), // JAV
+            Pair("全部視頻", ALL_VIDEOS),
         ),
     )
 
@@ -32,6 +33,10 @@ internal object RouVideoFilters {
     open class UriPartFilter(displayName: String, val options: Array<Pair<String, String>>) :
         AnimeFilter.Select<String>(displayName, options.map { it.first }.toTypedArray()) {
         fun toUriPart() = options[state].second
-        val selected get() = options[state].second.takeUnless { state == 0 }
+        fun isDefault() = state == 0
     }
+
+    const val FEATURED = "featured"
+    const val WATCHING = "watching"
+    const val ALL_VIDEOS = "all-videos"
 }

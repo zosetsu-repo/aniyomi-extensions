@@ -1,6 +1,9 @@
 package eu.kanade.tachiyomi.animeextension.all.rouvideo
 
 import eu.kanade.tachiyomi.animeextension.all.rouvideo.RouVideoDto.toAnimePage
+import eu.kanade.tachiyomi.animeextension.all.rouvideo.RouVideoFilters.ALL_VIDEOS
+import eu.kanade.tachiyomi.animeextension.all.rouvideo.RouVideoFilters.FEATURED
+import eu.kanade.tachiyomi.animeextension.all.rouvideo.RouVideoFilters.WATCHING
 import eu.kanade.tachiyomi.animesource.model.AnimeFilter
 import eu.kanade.tachiyomi.animesource.model.AnimeFilterList
 import eu.kanade.tachiyomi.animesource.model.AnimesPage
@@ -93,17 +96,20 @@ class RouVideo : AnimeHttpSource() {
         val categoryFilter = filters.filterIsInstance<RouVideoFilters.CategoryFilter>().firstOrNull()
         val sortFilter = filters.filterIsInstance<RouVideoFilters.SortFilter>().firstOrNull()
 
-        if (categoryFilter?.toUriPart() == "watching") {
+        if (query.isBlank() && categoryFilter?.toUriPart() == WATCHING) {
             return GET(watchingURL, apiHeaders)
         }
 
         return GET(
             baseUrl.toHttpUrl().newBuilder().apply {
                 if (query.isBlank()) {
-                    if (categoryFilter == null || categoryFilter.state == 0) {
-                        addPathSegment(VIDEO_SLUG)
-                    } else {
-                        addPathSegments("$CATEGORY_SLUG/${categoryFilter.toUriPart()}")
+                    when {
+                        categoryFilter == null || categoryFilter.toUriPart() == FEATURED ->
+                            addPathSegment("home")
+                        categoryFilter.toUriPart() == ALL_VIDEOS ->
+                            addPathSegment(VIDEO_SLUG)
+                        else ->
+                            addPathSegments("$CATEGORY_SLUG/${categoryFilter.toUriPart()}")
                     }
                     sortFilter?.let { addQueryParameter("order", it.toUriPart()) }
                 } else {
@@ -119,14 +125,26 @@ class RouVideo : AnimeHttpSource() {
 
     override fun searchAnimeParse(response: Response): AnimesPage {
         val request = response.request.url
-        if (request.toString().contains(watchingURL)) {
-            val jsonStr = response.body.string()
-            return json.decodeFromString<List<RouVideoDto.Video>>(jsonStr)
-                .toAnimePage()
+        return when {
+            request.toString().contains(watchingURL) -> {
+                val jsonStr = response.body.string()
+                json.decodeFromString<List<RouVideoDto.Video>>(jsonStr)
+                    .toAnimePage()
+            }
+            request.toString().contains("$baseUrl/home") -> {
+                val document = response.asJsoup()
+                document.selectFirst("script#__NEXT_DATA__")?.data()
+                    ?.let {
+                        json.decodeFromString<RouVideoDto.HotVideoList>(it)
+                            .props.pageProps.toAnimePage()
+                    }
+                    ?: AnimesPage(emptyList(), false)
+            }
+            else -> popularAnimeParse(response)
         }
-        return popularAnimeParse(response)
     }
 
+    private val hotListURL by lazy { "$apiUrl/home" }
     private val watchingURL by lazy { "$apiUrl/$VIDEO_SLUG/watching" }
 
     // ============================== Filters ===============================
