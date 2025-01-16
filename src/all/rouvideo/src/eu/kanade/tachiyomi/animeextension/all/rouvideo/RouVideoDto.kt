@@ -25,9 +25,9 @@ internal object RouVideoDto {
                 val pageNum: Int,
                 val totalPage: Int,
                 val totalVideoNum: Int,
-                val tagsForCNAV: List<Tag>?,
-                val tags91: List<Tag>?,
-                val tagsOF: List<Tag>?, // OnlyFans, only in tag browse
+                val tagsForCNAV: List<TagItem>?,
+                val tags91: List<TagItem>?,
+                val tagsOF: List<TagItem>?, // OnlyFans, only in tag browse
                 val hotSearches: List<String>?, // only in Search
             ) {
                 fun toAnimePage(): AnimesPage {
@@ -153,6 +153,8 @@ internal object RouVideoDto {
             date_upload = createdAt.toDate()
             episode_number = 1f
         }
+
+        fun getTagList(): Set<Tag> = tags.map { Tag(it, it) }.toSet()
     }
 
     fun formatDuration(seconds: Int): String {
@@ -174,10 +176,10 @@ internal object RouVideoDto {
         ) {
             @Serializable
             data class PagePropsObject(
-                val gcAV: List<Tag>,
-                val madouAV: List<Tag>,
-                val v91: List<Tag>,
-                val onlyfans: List<Tag>,
+                val gcAV: List<TagItem>,
+                val madouAV: List<TagItem>,
+                val v91: List<TagItem>,
+                val onlyfans: List<TagItem>,
             ) {
                 fun toTagList(): Tags {
                     return listOf(
@@ -194,7 +196,7 @@ internal object RouVideoDto {
     }
 
     @Serializable
-    data class Tag(
+    data class TagItem(
         @SerialName("id")
         val name: String,
         val count: Int,

@@ -1,7 +1,10 @@
 package eu.kanade.tachiyomi.animeextension.all.rouvideo
 
+import android.app.Application
+import android.content.SharedPreferences
 import eu.kanade.tachiyomi.animeextension.all.rouvideo.RouVideoDto.toAnimePage
 import eu.kanade.tachiyomi.animeextension.all.rouvideo.RouVideoFilters.ALL_VIDEOS
+import eu.kanade.tachiyomi.animeextension.all.rouvideo.RouVideoFilters.CATEGORIES
 import eu.kanade.tachiyomi.animeextension.all.rouvideo.RouVideoFilters.FEATURED
 import eu.kanade.tachiyomi.animeextension.all.rouvideo.RouVideoFilters.WATCHING
 import eu.kanade.tachiyomi.animesource.model.AnimeFilter
@@ -19,6 +22,8 @@ import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.Request
 import okhttp3.Response
 import org.jsoup.nodes.Document
+import uy.kohesive.injekt.Injekt
+import uy.kohesive.injekt.api.get
 import uy.kohesive.injekt.injectLazy
 
 class RouVideo : AnimeHttpSource() {
@@ -34,6 +39,10 @@ class RouVideo : AnimeHttpSource() {
     override val supportsLatest = true
 
     private val json: Json by injectLazy()
+
+    private val preferences: SharedPreferences by lazy {
+        Injekt.get<Application>().getSharedPreferences("source_$id", 0x0000)
+    }
 
     private val apiHeaders = headers.newBuilder().apply {
         add("Accept", "application/json, text/plain, */*")
@@ -166,10 +175,13 @@ class RouVideo : AnimeHttpSource() {
             AnimeFilter.Header("NOTE: Sort is ignored if using text search"),
             RouVideoFilters.CategoryFilter(),
             RouVideoFilters.TagFilter(
-                if (this::tagsArray.isInitialized) {
-                    arrayOf(Tag("<Set Category to 'All videos'>", "")).plus(tagsArray)
-                } else {
+                if (!this::tagsArray.isInitialized && savedTags.isEmpty()) {
                     arrayOf(Tag("<Reset filter to load>", ""))
+                } else {
+                    setOf(Tag("<Set Category to 'All videos'>", ""))
+                        .plus(if (this::tagsArray.isInitialized) tagsArray.toSet() else emptySet())
+                        .plus(savedTags.minus(CATEGORIES.map { Tag(it, it) }.toSet()))
+                        .toTypedArray()
                 },
             ),
         )
@@ -179,6 +191,11 @@ class RouVideo : AnimeHttpSource() {
      * Automatically fetched tags from the source to be used in the filters.
      */
     private lateinit var tagsArray: Tags
+
+    /**
+     * The request to the page that have the tags list.
+     */
+    private fun tagsListRequest() = GET("$baseUrl/cat")
 
     /**
      * Fetch the genres from the source to be used in the filters.
@@ -200,11 +217,6 @@ class RouVideo : AnimeHttpSource() {
     }
 
     /**
-     * The request to the page that have the tags list.
-     */
-    private fun tagsListRequest() = GET("$baseUrl/cat")
-
-    /**
      * Get the genres from the document.
      */
     private fun tagsListParse(document: Document): Tags {
@@ -215,6 +227,21 @@ class RouVideo : AnimeHttpSource() {
             }
             ?: emptyArray<Tag>()
     }
+
+    private var savedTags: Set<Tag> = loadTagListFromPreferences()
+        set(value) {
+            preferences.edit().putStringSet(
+                TAG_LIST_PREF,
+                value.map { it.first }.toSet(),
+            ).apply()
+            field = value
+        }
+
+    private fun loadTagListFromPreferences(): Set<Tag> =
+        preferences.getStringSet(TAG_LIST_PREF, emptySet())
+            ?.mapNotNull { Tag(it, it) }
+            ?.toSet()
+            ?: emptySet()
 
     // =========================== Anime Details ============================
 
@@ -228,7 +255,10 @@ class RouVideo : AnimeHttpSource() {
             .execute().asJsoup()
             .let { document ->
                 val data = document.selectFirst("script#__NEXT_DATA__")?.data() ?: return SAnime.create()
-                json.decodeFromString<RouVideoDto.VideoDetails>(data).props.pageProps.video.toSAnime()
+                val video = json.decodeFromString<RouVideoDto.VideoDetails>(data).props.pageProps.video
+
+                savedTags = savedTags.plus(video.getTagList())
+                video.toSAnime()
                     .apply {
                         // Search & RelatedVideos doesn't have likeCount while AnimeDetails doesn't have resolution
                         val resolutionSet = description?.matches(resolutionRegex) ?: false
@@ -282,5 +312,7 @@ class RouVideo : AnimeHttpSource() {
         const val SORT_LATEST_KEY = "createdAt"
         const val SORT_LIKE_KEY = "likeCount"
         const val SORT_VIEW_KEY = "viewCount"
+
+        private const val TAG_LIST_PREF = "TAG_LIST"
     }
 }

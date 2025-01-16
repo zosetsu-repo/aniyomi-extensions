@@ -12,14 +12,9 @@ internal object RouVideoFilters {
         arrayOf(
             Tag("精選", FEATURED),
             Tag("大家正在看", WATCHING),
-            Tag("國產AV", "國產AV"), // ChineseAV
-            Tag("麻豆傳媒", "麻豆傳媒"), // Madou Media
-            Tag("自拍流出", "自拍流出"), // Selfie leaked
-            Tag("探花", "探花"), // Tanhua (Flower exploration - Thám hoa - Check hàng)
-            Tag("OnlyFans", "OnlyFans"),
-            Tag("日本", "日本"), // JAV
-            Tag("全部視頻", ALL_VIDEOS),
-        ),
+        )
+            .plus(CATEGORIES.map { Tag(it, it) })
+            .plus(Tag("全部視頻", ALL_VIDEOS)),
     )
 
     class TagFilter(tags: Tags) : UriPartFilter(
@@ -42,6 +37,15 @@ internal object RouVideoFilters {
         fun isEmpty() = options[state].second == ""
         fun isDefault() = state == 0
     }
+
+    val CATEGORIES = setOf(
+        "國產AV", // ChineseAV
+        "麻豆傳媒", // Madou Media
+        "自拍流出", // Selfie leaked
+        "探花", // Tanhua (Flower exploration - Thám hoa - Check hàng)
+        "OnlyFans",
+        "日本", // JAV
+    )
 
     const val FEATURED = "featured"
     const val WATCHING = "watching"
