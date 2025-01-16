@@ -1,10 +1,5 @@
 package eu.kanade.tachiyomi.animeextension.all.rouvideo
 
-import android.app.Application
-import android.content.SharedPreferences
-import androidx.preference.ListPreference
-import androidx.preference.PreferenceScreen
-import eu.kanade.tachiyomi.animesource.ConfigurableAnimeSource
 import eu.kanade.tachiyomi.animesource.model.AnimeFilter
 import eu.kanade.tachiyomi.animesource.model.AnimeFilterList
 import eu.kanade.tachiyomi.animesource.model.AnimesPage
@@ -19,11 +14,10 @@ import kotlinx.serialization.json.Json
 import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.Request
 import okhttp3.Response
-import uy.kohesive.injekt.Injekt
 import uy.kohesive.injekt.api.get
 import uy.kohesive.injekt.injectLazy
 
-class RouVideo : ConfigurableAnimeSource, AnimeHttpSource() {
+class RouVideo : AnimeHttpSource() {
 
     override val name = "肉視頻"
 
@@ -36,10 +30,6 @@ class RouVideo : ConfigurableAnimeSource, AnimeHttpSource() {
     override val supportsLatest = true
 
     private val json: Json by injectLazy()
-
-    private val preferences: SharedPreferences by lazy {
-        Injekt.get<Application>().getSharedPreferences("source_$id", 0x0000)
-    }
 
     private val apiHeaders = headers.newBuilder().apply {
         add("Accept", "application/json, text/plain, */*")
@@ -103,12 +93,24 @@ class RouVideo : ConfigurableAnimeSource, AnimeHttpSource() {
     // =============================== Search ===============================
 
     override fun searchAnimeRequest(page: Int, query: String, filters: AnimeFilterList): Request {
+        val categoryFilter = filters.filterIsInstance<RouVideoFilters.CategoryFilter>().firstOrNull()
+        val sortFilter = filters.filterIsInstance<RouVideoFilters.SortFilter>().firstOrNull()
+
         return GET(
             baseUrl.toHttpUrl().newBuilder().apply {
-                addPathSegment("search")
-                addQueryParameter("q", query)
+                if (query.isBlank()) {
+                    if (categoryFilter == null || categoryFilter.state == 0) {
+                        addPathSegment(VIDEO_SLUG)
+                    } else {
+                        addPathSegments("$CATEGORY_SLUG/${categoryFilter.toUriPart()}")
+                    }
+                    sortFilter?.let { addQueryParameter("order", it.toUriPart()) }
+                } else {
+                    addPathSegment("search")
+                    addQueryParameter("q", query)
+                    categoryFilter?.let { addQueryParameter(CATEGORY_SLUG, it.toUriPart()) }
+                }
                 addQueryParameter("page", page.toString())
-                // addQueryParameter("t", "tag"), empty for all
             }.build(),
             docHeaders,
         )
@@ -119,27 +121,10 @@ class RouVideo : ConfigurableAnimeSource, AnimeHttpSource() {
     // ============================== Filters ===============================
 
     override fun getFilterList(): AnimeFilterList = AnimeFilterList(
-        AnimeFilter.Header("NOTE: Filters are going to be ignored if using search text"),
-        GenreFilter(),
+        RouVideoFilters.CategoryFilter(),
+        AnimeFilter.Header("NOTE: Sort is ignored if using text search"),
+        RouVideoFilters.SortFilter(),
     )
-
-    private class GenreFilter : UriPartFilter(
-        "Genre",
-        arrayOf(
-            Pair("<select>", ""),
-            Pair("Comedy", "/?genre=\"Comedy\""),
-            Pair("Drama", "/?genre=\"Drama\""),
-            Pair("Action", "/?genre=\"Action\""),
-            Pair("Fantasy", "/?genre=\"Fantasy\""),
-            Pair("Supernatural", "/?genre=\"Supernatural\""),
-            Pair("Latest Movie", "/?sort={\"startDate\": -1 }&type=MOVIE"),
-        ),
-    )
-
-    private open class UriPartFilter(displayName: String, val vals: Array<Pair<String, String>>) :
-        AnimeFilter.Select<String>(displayName, vals.map { it.first }.toTypedArray()) {
-        fun toUriPart() = vals[state].second
-    }
 
     // =========================== Anime Details ============================
 
@@ -166,16 +151,7 @@ class RouVideo : ConfigurableAnimeSource, AnimeHttpSource() {
 
     override fun animeDetailsRequest(anime: SAnime) = GET(getAnimeUrl(anime), docHeaders)
 
-    override fun animeDetailsParse(response: Response): SAnime {
-        val document = response.asJsoup()
-        val data = document.selectFirst("script#__NEXT_DATA__")?.data() ?: return SAnime.create()
-
-        return json.decodeFromString<RouVideoDto.VideoDetails>(data).props.pageProps.video.toSAnime()
-            .apply {
-                // Don't update description if it's already set
-                description = null
-            }
-    }
+    override fun animeDetailsParse(response: Response): SAnime = throw UnsupportedOperationException()
 
     // ============================== Episodes ==============================
 
@@ -209,45 +185,12 @@ class RouVideo : ConfigurableAnimeSource, AnimeHttpSource() {
 
     // ============================= Utilities ==============================
 
-    override fun List<Video>.sort(): List<Video> {
-        val quality = preferences.getString(PREF_QUALITY_KEY, PREF_QUALITY_DEFAULT)!!
-
-        return this.sortedWith(
-            compareBy(
-                { it.quality.contains(quality) },
-                { Regex("""(\d+)p""").find(it.quality)?.groupValues?.get(1)?.toIntOrNull() ?: 0 },
-            ),
-        ).reversed()
-    }
-
     companion object {
-        private const val PREF_QUALITY_KEY = "preferred_quality"
-        private const val PREF_QUALITY_DEFAULT = "1080"
-
         private const val VIDEO_SLUG = "v"
         private const val CATEGORY_SLUG = "t"
 
-        private const val SORT_LATEST_KEY = "createdAt"
-        private const val SORT_LIKE_KEY = "likeCount"
-        private const val SORT_VIEW_KEY = "viewCount"
-    }
-    // ============================== Settings ==============================
-
-    override fun setupPreferenceScreen(screen: PreferenceScreen) {
-        ListPreference(screen.context).apply {
-            key = PREF_QUALITY_KEY
-            title = "Preferred quality"
-            entries = arrayOf("1080p", "720p", "480p", "360p")
-            entryValues = arrayOf("1080", "720", "480", "360")
-            setDefaultValue(PREF_QUALITY_DEFAULT)
-            summary = "%s"
-
-            setOnPreferenceChangeListener { _, newValue ->
-                val selected = newValue as String
-                val index = findIndexOfValue(selected)
-                val entry = entryValues[index] as String
-                preferences.edit().putString(key, entry).commit()
-            }
-        }.also(screen::addPreference)
+        const val SORT_LATEST_KEY = "createdAt"
+        const val SORT_LIKE_KEY = "likeCount"
+        const val SORT_VIEW_KEY = "viewCount"
     }
 }
