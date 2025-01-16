@@ -3,10 +3,6 @@ package eu.kanade.tachiyomi.animeextension.all.rouvideo
 import android.app.Application
 import android.content.SharedPreferences
 import eu.kanade.tachiyomi.animeextension.all.rouvideo.RouVideoDto.toAnimePage
-import eu.kanade.tachiyomi.animeextension.all.rouvideo.RouVideoFilters.ALL_VIDEOS
-import eu.kanade.tachiyomi.animeextension.all.rouvideo.RouVideoFilters.CATEGORIES
-import eu.kanade.tachiyomi.animeextension.all.rouvideo.RouVideoFilters.FEATURED
-import eu.kanade.tachiyomi.animeextension.all.rouvideo.RouVideoFilters.WATCHING
 import eu.kanade.tachiyomi.animesource.model.AnimeFilter
 import eu.kanade.tachiyomi.animesource.model.AnimeFilterList
 import eu.kanade.tachiyomi.animesource.model.AnimesPage
@@ -14,6 +10,7 @@ import eu.kanade.tachiyomi.animesource.model.SAnime
 import eu.kanade.tachiyomi.animesource.model.SEpisode
 import eu.kanade.tachiyomi.animesource.model.Video
 import eu.kanade.tachiyomi.animesource.online.AnimeHttpSource
+import eu.kanade.tachiyomi.lib.i18n.Intl
 import eu.kanade.tachiyomi.lib.playlistutils.PlaylistUtils
 import eu.kanade.tachiyomi.network.GET
 import eu.kanade.tachiyomi.util.asJsoup
@@ -25,6 +22,7 @@ import org.jsoup.nodes.Document
 import uy.kohesive.injekt.Injekt
 import uy.kohesive.injekt.api.get
 import uy.kohesive.injekt.injectLazy
+import java.util.Locale
 
 class RouVideo : AnimeHttpSource() {
 
@@ -43,6 +41,13 @@ class RouVideo : AnimeHttpSource() {
     private val preferences: SharedPreferences by lazy {
         Injekt.get<Application>().getSharedPreferences("source_$id", 0x0000)
     }
+
+    private val intl = Intl(
+        language = Locale.getDefault().language,
+        baseLanguage = "en",
+        availableLanguages = setOf("en", "zh", "vi"),
+        classLoader = this::class.java.classLoader!!,
+    )
 
     private val apiHeaders = headers.newBuilder().apply {
         add("Accept", "application/json, text/plain, */*")
@@ -109,9 +114,9 @@ class RouVideo : AnimeHttpSource() {
 
     override fun searchAnimeRequest(page: Int, query: String, filters: AnimeFilterList): Request {
         fetchTagsList()
-        val categoryFilter = filters.filterIsInstance<RouVideoFilters.CategoryFilter>().firstOrNull()
-        val sortFilter = filters.filterIsInstance<RouVideoFilters.SortFilter>().firstOrNull()
-        val tagFilter = filters.filterIsInstance<RouVideoFilters.TagFilter>().firstOrNull()
+        val categoryFilter = filters.filterIsInstance<CategoryFilter>().firstOrNull()
+        val sortFilter = filters.filterIsInstance<SortFilter>().firstOrNull()
+        val tagFilter = filters.filterIsInstance<TagFilter>().firstOrNull()
 
         if (query.isBlank() && categoryFilter?.toUriPart() == WATCHING) {
             return GET(watchingURL, apiHeaders)
@@ -171,14 +176,15 @@ class RouVideo : AnimeHttpSource() {
         fetchTagsList()
 
         return AnimeFilterList(
-            RouVideoFilters.SortFilter(),
-            AnimeFilter.Header("NOTE: Sort is ignored if using text search"),
-            RouVideoFilters.CategoryFilter(),
-            RouVideoFilters.TagFilter(
+            SortFilter(intl),
+            AnimeFilter.Header(intl["sort_filter_note"]),
+            CategoryFilter(intl),
+            TagFilter(
+                intl,
                 if (!this::tagsArray.isInitialized && savedTags.isEmpty()) {
-                    arrayOf(Tag("<Reset filter to load>", ""))
+                    arrayOf(Tag(intl["reset_filter_to_load"], ""))
                 } else {
-                    setOf(Tag("<Set Category to 'All videos'>", ""))
+                    setOf(Tag(intl["set_video_all_to_filter_tag"], ""))
                         .plus(if (this::tagsArray.isInitialized) tagsArray.toSet() else emptySet())
                         .plus(savedTags.minus(CATEGORIES.map { Tag(it, it) }.toSet()))
                         .toTypedArray()
@@ -248,7 +254,7 @@ class RouVideo : AnimeHttpSource() {
     override fun getAnimeUrl(anime: SAnime): String = "$baseUrl/$VIDEO_SLUG/${anime.url}"
 
     override suspend fun getAnimeDetails(anime: SAnime): SAnime {
-        val resolutionRegex = "(Resolution: \\d+p)".toRegex()
+        val resolutionRegex = "(🖥️ \\d+p)".toRegex()
         val resolution = anime.description?.let { resolutionRegex.find(it) }
             ?.groupValues?.first()
         return client.newCall(animeDetailsRequest(anime))
@@ -305,6 +311,37 @@ class RouVideo : AnimeHttpSource() {
 
     // ============================= Utilities ==============================
 
+    class CategoryFilter(intl: Intl) : UriPartFilter(
+        intl["category"],
+        arrayOf(
+            Tag(intl["featured"], FEATURED),
+            Tag(intl["other_watching"], WATCHING),
+        )
+            .plus(CATEGORIES.map { Tag(it, it) })
+            .plus(Tag(intl["all_videos"], ALL_VIDEOS)),
+    )
+
+    class TagFilter(intl: Intl, tags: Tags) : UriPartFilter(
+        intl["tag"],
+        tags,
+    )
+
+    class SortFilter(intl: Intl) : UriPartFilter(
+        intl["sort"],
+        arrayOf(
+            Pair(intl["latest_recent"], SORT_LATEST_KEY),
+            Pair(intl["most_viewed"], SORT_VIEW_KEY),
+            Pair(intl["most_liked"], SORT_LIKE_KEY),
+        ),
+    )
+
+    open class UriPartFilter(displayName: String, private val options: Tags) :
+        AnimeFilter.Select<String>(displayName, options.map { it.first }.toTypedArray()) {
+        fun toUriPart() = options[state].second
+        fun isEmpty() = options[state].second == ""
+        fun isDefault() = state == 0
+    }
+
     companion object {
         private const val VIDEO_SLUG = "v"
         private const val CATEGORY_SLUG = "t"
@@ -313,6 +350,22 @@ class RouVideo : AnimeHttpSource() {
         const val SORT_LIKE_KEY = "likeCount"
         const val SORT_VIEW_KEY = "viewCount"
 
+        const val FEATURED = "featured"
+        const val WATCHING = "watching"
+        const val ALL_VIDEOS = "all-videos"
+
+        val CATEGORIES = setOf(
+            "國產AV", // ChineseAV
+            "麻豆傳媒", // Madou Media
+            "自拍流出", // Selfie leaked
+            "探花", // Tanhua (Flower exploration - Thám hoa - Check hàng)
+            "OnlyFans",
+            "日本", // JAV
+        )
+
         private const val TAG_LIST_PREF = "TAG_LIST"
     }
 }
+
+typealias Tags = Array<Tag>
+typealias Tag = Pair<String, String>
