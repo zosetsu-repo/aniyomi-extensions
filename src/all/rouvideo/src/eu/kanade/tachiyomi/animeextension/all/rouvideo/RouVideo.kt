@@ -3,6 +3,12 @@ package eu.kanade.tachiyomi.animeextension.all.rouvideo
 import android.app.Application
 import android.content.SharedPreferences
 import eu.kanade.tachiyomi.animeextension.all.rouvideo.RouVideoDto.toAnimePage
+import eu.kanade.tachiyomi.animeextension.all.rouvideo.RouVideoFilter.ALL_VIDEOS
+import eu.kanade.tachiyomi.animeextension.all.rouvideo.RouVideoFilter.FEATURED
+import eu.kanade.tachiyomi.animeextension.all.rouvideo.RouVideoFilter.SORT_LATEST_KEY
+import eu.kanade.tachiyomi.animeextension.all.rouvideo.RouVideoFilter.SORT_LIKE_KEY
+import eu.kanade.tachiyomi.animeextension.all.rouvideo.RouVideoFilter.WATCHING
+import eu.kanade.tachiyomi.animeextension.all.rouvideo.RouVideoFilter.categories
 import eu.kanade.tachiyomi.animesource.model.AnimeFilter
 import eu.kanade.tachiyomi.animesource.model.AnimeFilterList
 import eu.kanade.tachiyomi.animesource.model.AnimesPage
@@ -114,9 +120,9 @@ class RouVideo : AnimeHttpSource() {
 
     override fun searchAnimeRequest(page: Int, query: String, filters: AnimeFilterList): Request {
         fetchTagsList()
-        val categoryFilter = filters.filterIsInstance<CategoryFilter>().firstOrNull()
-        val sortFilter = filters.filterIsInstance<SortFilter>().firstOrNull()
-        val tagFilter = filters.filterIsInstance<TagFilter>().firstOrNull()
+        val categoryFilter = filters.filterIsInstance<RouVideoFilter.CategoryFilter>().firstOrNull()
+        val sortFilter = filters.filterIsInstance<RouVideoFilter.SortFilter>().firstOrNull()
+        val tagFilter = filters.filterIsInstance<RouVideoFilter.TagFilter>().firstOrNull()
 
         if (query.isBlank() && categoryFilter?.toUriPart() == WATCHING) {
             return GET(watchingURL, apiHeaders)
@@ -176,17 +182,17 @@ class RouVideo : AnimeHttpSource() {
         fetchTagsList()
 
         return AnimeFilterList(
-            SortFilter(intl),
+            RouVideoFilter.SortFilter(intl),
             AnimeFilter.Header(intl["sort_filter_note"]),
-            CategoryFilter(intl),
-            TagFilter(
+            RouVideoFilter.CategoryFilter(intl),
+            RouVideoFilter.TagFilter(
                 intl,
                 if (!this::tagsArray.isInitialized && savedTags.isEmpty()) {
                     arrayOf(Tag(intl["reset_filter_to_load"], ""))
                 } else {
                     setOf(Tag(intl["set_video_all_to_filter_tag"], ""))
                         .plus(if (this::tagsArray.isInitialized) tagsArray.toSet() else emptySet())
-                        .plus(savedTags.minus(CATEGORIES.map { Tag(it, it) }.toSet()))
+                        .plus(savedTags.minus(categories(intl)))
                         .toTypedArray()
                 },
             ),
@@ -311,61 +317,10 @@ class RouVideo : AnimeHttpSource() {
 
     // ============================= Utilities ==============================
 
-    class CategoryFilter(intl: Intl) : UriPartFilter(
-        intl["category"],
-        arrayOf(
-            Tag(intl["featured"], FEATURED),
-            Tag(intl["other_watching"], WATCHING),
-        )
-            .plus(CATEGORIES.map { Tag(it, it) })
-            .plus(Tag(intl["all_videos"], ALL_VIDEOS)),
-    )
-
-    class TagFilter(intl: Intl, tags: Tags) : UriPartFilter(
-        intl["tag"],
-        tags,
-    )
-
-    class SortFilter(intl: Intl) : UriPartFilter(
-        intl["sort"],
-        arrayOf(
-            Pair(intl["latest_recent"], SORT_LATEST_KEY),
-            Pair(intl["most_viewed"], SORT_VIEW_KEY),
-            Pair(intl["most_liked"], SORT_LIKE_KEY),
-        ),
-    )
-
-    open class UriPartFilter(displayName: String, private val options: Tags) :
-        AnimeFilter.Select<String>(displayName, options.map { it.first }.toTypedArray()) {
-        fun toUriPart() = options[state].second
-        fun isEmpty() = options[state].second == ""
-        fun isDefault() = state == 0
-    }
-
     companion object {
         private const val VIDEO_SLUG = "v"
         private const val CATEGORY_SLUG = "t"
 
-        const val SORT_LATEST_KEY = "createdAt"
-        const val SORT_LIKE_KEY = "likeCount"
-        const val SORT_VIEW_KEY = "viewCount"
-
-        const val FEATURED = "featured"
-        const val WATCHING = "watching"
-        const val ALL_VIDEOS = "all-videos"
-
-        val CATEGORIES = setOf(
-            "國產AV", // ChineseAV
-            "麻豆傳媒", // Madou Media
-            "自拍流出", // Selfie leaked
-            "探花", // Tanhua (Flower exploration - Thám hoa - Check hàng)
-            "OnlyFans",
-            "日本", // JAV
-        )
-
         private const val TAG_LIST_PREF = "TAG_LIST"
     }
 }
-
-typealias Tags = Array<Tag>
-typealias Tag = Pair<String, String>
