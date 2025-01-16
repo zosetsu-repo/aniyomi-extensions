@@ -18,7 +18,7 @@ import kotlinx.serialization.json.Json
 import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.Request
 import okhttp3.Response
-import uy.kohesive.injekt.api.get
+import org.jsoup.nodes.Document
 import uy.kohesive.injekt.injectLazy
 
 class RouVideo : AnimeHttpSource() {
@@ -59,14 +59,17 @@ class RouVideo : AnimeHttpSource() {
 
     // ============================== Popular ===============================
 
-    override fun popularAnimeRequest(page: Int): Request = GET(
-        baseUrl.toHttpUrl().newBuilder().apply {
-            addPathSegment("v")
-            addQueryParameter("order", SORT_LIKE_KEY)
-            addQueryParameter("page", page.toString())
-        }.build(),
-        docHeaders,
-    )
+    override fun popularAnimeRequest(page: Int): Request {
+        fetchTagsList()
+        return GET(
+            baseUrl.toHttpUrl().newBuilder().apply {
+                addPathSegment("v")
+                addQueryParameter("order", SORT_LIKE_KEY)
+                addQueryParameter("page", page.toString())
+            }.build(),
+            docHeaders,
+        )
+    }
 
     override fun popularAnimeParse(response: Response): AnimesPage {
         val document = response.asJsoup()
@@ -79,22 +82,27 @@ class RouVideo : AnimeHttpSource() {
 
     // =============================== Latest ===============================
 
-    override fun latestUpdatesRequest(page: Int): Request = GET(
-        baseUrl.toHttpUrl().newBuilder().apply {
-            addPathSegment("v")
-            addQueryParameter("order", SORT_LATEST_KEY)
-            addQueryParameter("page", page.toString())
-        }.build(),
-        docHeaders,
-    )
+    override fun latestUpdatesRequest(page: Int): Request {
+        fetchTagsList()
+        return GET(
+            baseUrl.toHttpUrl().newBuilder().apply {
+                addPathSegment("v")
+                addQueryParameter("order", SORT_LATEST_KEY)
+                addQueryParameter("page", page.toString())
+            }.build(),
+            docHeaders,
+        )
+    }
 
     override fun latestUpdatesParse(response: Response): AnimesPage = popularAnimeParse(response)
 
     // =============================== Search ===============================
 
     override fun searchAnimeRequest(page: Int, query: String, filters: AnimeFilterList): Request {
+        fetchTagsList()
         val categoryFilter = filters.filterIsInstance<RouVideoFilters.CategoryFilter>().firstOrNull()
         val sortFilter = filters.filterIsInstance<RouVideoFilters.SortFilter>().firstOrNull()
+        val tagFilter = filters.filterIsInstance<RouVideoFilters.TagFilter>().firstOrNull()
 
         if (query.isBlank() && categoryFilter?.toUriPart() == WATCHING) {
             return GET(watchingURL, apiHeaders)
@@ -106,10 +114,12 @@ class RouVideo : AnimeHttpSource() {
                     when {
                         categoryFilter == null || categoryFilter.toUriPart() == FEATURED ->
                             addPathSegment("home")
-                        categoryFilter.toUriPart() == ALL_VIDEOS ->
-                            addPathSegment(VIDEO_SLUG)
-                        else ->
+                        categoryFilter.toUriPart() != ALL_VIDEOS ->
                             addPathSegments("$CATEGORY_SLUG/${categoryFilter.toUriPart()}")
+                        tagFilter != null && !tagFilter.isEmpty() ->
+                            addPathSegments("$CATEGORY_SLUG/${tagFilter.toUriPart()}")
+                        else ->
+                            addPathSegment(VIDEO_SLUG)
                     }
                     sortFilter?.let { addQueryParameter("order", it.toUriPart()) }
                 } else {
@@ -144,16 +154,67 @@ class RouVideo : AnimeHttpSource() {
         }
     }
 
-    private val hotListURL by lazy { "$apiUrl/home" }
     private val watchingURL by lazy { "$apiUrl/$VIDEO_SLUG/watching" }
 
     // ============================== Filters ===============================
 
-    override fun getFilterList(): AnimeFilterList = AnimeFilterList(
-        RouVideoFilters.CategoryFilter(),
-        AnimeFilter.Header("NOTE: Sort is ignored if using text search"),
-        RouVideoFilters.SortFilter(),
-    )
+    override fun getFilterList(): AnimeFilterList {
+        fetchTagsList()
+
+        return AnimeFilterList(
+            RouVideoFilters.SortFilter(),
+            AnimeFilter.Header("NOTE: Sort is ignored if using text search"),
+            RouVideoFilters.CategoryFilter(),
+            RouVideoFilters.TagFilter(
+                if (this::tagsArray.isInitialized) {
+                    arrayOf(Tag("<Set Category to 'All videos'>", "")).plus(tagsArray)
+                } else {
+                    arrayOf(Tag("<Reset filter to load>", ""))
+                },
+            ),
+        )
+    }
+
+    /**
+     * Automatically fetched tags from the source to be used in the filters.
+     */
+    private lateinit var tagsArray: Tags
+
+    /**
+     * Fetch the genres from the source to be used in the filters.
+     */
+    private fun fetchTagsList() {
+        if (!this::tagsArray.isInitialized) {
+            runCatching {
+                client.newCall(tagsListRequest())
+                    .execute()
+                    .asJsoup()
+                    .let(::tagsListParse)
+                    .let { tags ->
+                        if (tags.isNotEmpty()) {
+                            tagsArray = tags
+                        }
+                    }
+            }.onFailure { it.printStackTrace() }
+        }
+    }
+
+    /**
+     * The request to the page that have the tags list.
+     */
+    private fun tagsListRequest() = GET("$baseUrl/cat")
+
+    /**
+     * Get the genres from the document.
+     */
+    private fun tagsListParse(document: Document): Tags {
+        return document.selectFirst("script#__NEXT_DATA__")?.data()
+            ?.let {
+                json.decodeFromString<RouVideoDto.TagList>(it)
+                    .props.pageProps.toTagList()
+            }
+            ?: emptyArray<Tag>()
+    }
 
     // =========================== Anime Details ============================
 

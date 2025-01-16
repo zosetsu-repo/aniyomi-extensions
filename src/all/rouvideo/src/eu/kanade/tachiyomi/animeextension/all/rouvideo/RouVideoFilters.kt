@@ -10,15 +10,21 @@ internal object RouVideoFilters {
     class CategoryFilter : UriPartFilter(
         "分類",
         arrayOf(
-            Pair("精選", FEATURED),
-            Pair("大家正在看", WATCHING),
-            Pair("國產AV", "國產AV"), // ChineseAV
-            Pair("自拍流出", "自拍流出"), // Selfie leaked
-            Pair("探花", "探花"), // Tanhua (Flower exploration - Thám hoa - Check hàng)
-            Pair("OnlyFans", "OnlyFans"),
-            Pair("日本", "日本"), // JAV
-            Pair("全部視頻", ALL_VIDEOS),
+            Tag("精選", FEATURED),
+            Tag("大家正在看", WATCHING),
+            Tag("國產AV", "國產AV"), // ChineseAV
+            Tag("麻豆傳媒", "麻豆傳媒"), // Madou Media
+            Tag("自拍流出", "自拍流出"), // Selfie leaked
+            Tag("探花", "探花"), // Tanhua (Flower exploration - Thám hoa - Check hàng)
+            Tag("OnlyFans", "OnlyFans"),
+            Tag("日本", "日本"), // JAV
+            Tag("全部視頻", ALL_VIDEOS),
         ),
+    )
+
+    class TagFilter(tags: Tags) : UriPartFilter(
+        "標籤",
+        tags,
     )
 
     class SortFilter : UriPartFilter(
@@ -30,9 +36,10 @@ internal object RouVideoFilters {
         ),
     )
 
-    open class UriPartFilter(displayName: String, val options: Array<Pair<String, String>>) :
+    open class UriPartFilter(displayName: String, private val options: Tags) :
         AnimeFilter.Select<String>(displayName, options.map { it.first }.toTypedArray()) {
         fun toUriPart() = options[state].second
+        fun isEmpty() = options[state].second == ""
         fun isDefault() = state == 0
     }
 
@@ -40,3 +47,6 @@ internal object RouVideoFilters {
     const val WATCHING = "watching"
     const val ALL_VIDEOS = "all-videos"
 }
+
+typealias Tags = Array<Tag>
+typealias Tag = Pair<String, String>

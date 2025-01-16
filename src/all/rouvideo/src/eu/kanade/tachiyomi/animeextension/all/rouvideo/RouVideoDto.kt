@@ -165,6 +165,35 @@ internal object RouVideoDto {
     }
 
     @Serializable
+    data class TagList(
+        val props: PropsObject,
+    ) {
+        @Serializable
+        data class PropsObject(
+            val pageProps: PagePropsObject,
+        ) {
+            @Serializable
+            data class PagePropsObject(
+                val gcAV: List<Tag>,
+                val madouAV: List<Tag>,
+                val v91: List<Tag>,
+                val onlyfans: List<Tag>,
+            ) {
+                fun toTagList(): Tags {
+                    return listOf(
+                        gcAV,
+                        madouAV,
+                        v91,
+                        onlyfans,
+                    ).flatten()
+                        .map { Pair(it.name, it.name) }
+                        .toTypedArray()
+                }
+            }
+        }
+    }
+
+    @Serializable
     data class Tag(
         @SerialName("id")
         val name: String,
