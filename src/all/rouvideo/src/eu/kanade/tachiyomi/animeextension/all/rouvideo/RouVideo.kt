@@ -32,15 +32,15 @@ import uy.kohesive.injekt.api.get
 import uy.kohesive.injekt.injectLazy
 import java.util.Locale
 
-class RouVideo : AnimeHttpSource() {
+class RouVideo(
+    override val lang: String = "all",
+) : AnimeHttpSource() {
 
     override val name = "肉視頻"
 
     override val baseUrl = "https://rou.video"
 
     private val apiUrl = "https://rou.video/api"
-
-    override val lang = "all"
 
     override val supportsLatest = true
 
@@ -51,7 +51,7 @@ class RouVideo : AnimeHttpSource() {
     }
 
     private val intl = Intl(
-        language = Locale.getDefault().language,
+        language = Locale.getDefault().language.takeIf { lang == "all" } ?: lang,
         baseLanguage = "en",
         availableLanguages = setOf("en", "zh", "vi"),
         classLoader = this::class.java.classLoader!!,

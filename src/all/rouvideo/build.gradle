@@ -2,6 +2,7 @@ ext {
     extName = 'RouVideo'
     extClass = '.RouVideo'
     extVersionCode = 1
+    isNsfw = true
 }
 
 apply from: "$rootDir/common.gradle"
