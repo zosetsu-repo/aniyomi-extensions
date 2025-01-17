@@ -38,7 +38,8 @@ class RouVideo(
 
     override val name = "肉視頻"
 
-    override val baseUrl = "https://rou.video"
+    override val baseUrl = "https://rou.video/home"
+    private val videoUrl = "https://rou.video"
 
     private val apiUrl = "https://rou.video/api"
 
@@ -60,20 +61,20 @@ class RouVideo(
     private val apiHeaders = headers.newBuilder().apply {
         add("Accept", "application/json, text/plain, */*")
         add("Host", apiUrl.toHttpUrl().host)
-        add("Origin", baseUrl)
-        add("Referer", "$baseUrl/")
+        add("Origin", videoUrl)
+        add("Referer", "$videoUrl/")
     }.build()
 
     private val docHeaders = headers.newBuilder().apply {
         add("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8")
-        add("Host", baseUrl.toHttpUrl().host)
+        add("Host", videoUrl.toHttpUrl().host)
     }.build()
 
     private val videoHeaders by lazy {
         headers.newBuilder().apply {
             add("Accept", "video/webm,video/ogg,video/*;q=0.9,application/ogg;q=0.7,audio/*;q=0.6,*/*;q=0.5")
             add("Host", apiUrl.toHttpUrl().host)
-            add("Referer", "$baseUrl/")
+            add("Referer", "$videoUrl/")
         }.build()
     }
 
@@ -84,7 +85,7 @@ class RouVideo(
     override fun popularAnimeRequest(page: Int): Request {
         fetchTagsList()
         return GET(
-            baseUrl.toHttpUrl().newBuilder().apply {
+            videoUrl.toHttpUrl().newBuilder().apply {
                 addPathSegment("v")
                 addQueryParameter("order", SORT_LIKE_KEY)
                 addQueryParameter("page", page.toString())
@@ -107,7 +108,7 @@ class RouVideo(
     override fun latestUpdatesRequest(page: Int): Request {
         fetchTagsList()
         return GET(
-            baseUrl.toHttpUrl().newBuilder().apply {
+            videoUrl.toHttpUrl().newBuilder().apply {
                 addPathSegment("v")
                 addQueryParameter("order", SORT_LATEST_KEY)
                 addQueryParameter("page", page.toString())
@@ -130,7 +131,7 @@ class RouVideo(
             }
             query.startsWith(PREFIX_TAG) -> {
                 val tag = query.removePrefix(PREFIX_TAG)
-                val url = baseUrl.toHttpUrl().newBuilder().apply {
+                val url = videoUrl.toHttpUrl().newBuilder().apply {
                     addPathSegments("$CATEGORY_SLUG/$tag")
                     addQueryParameter("page", page.toString())
                 }.build()
@@ -162,7 +163,7 @@ class RouVideo(
                         }
 
                     else -> {
-                        val url = baseUrl.toHttpUrl().newBuilder().apply {
+                        val url = videoUrl.toHttpUrl().newBuilder().apply {
                             if (query.isBlank()) {
                                 when {
                                     categoryFilter.toUriPart() != ALL_VIDEOS ->
@@ -195,7 +196,7 @@ class RouVideo(
             .use(parse)
     }
 
-    private val featuredURL by lazy { "$baseUrl/home" }
+    private val featuredURL = baseUrl
     private val watchingURL by lazy { "$apiUrl/$VIDEO_SLUG/watching" }
 
     override fun searchAnimeRequest(page: Int, query: String, filters: AnimeFilterList): Request = throw UnsupportedOperationException()
@@ -233,7 +234,7 @@ class RouVideo(
     /**
      * The request to the page that have the tags list.
      */
-    private fun tagsListRequest() = GET("$baseUrl/cat")
+    private fun tagsListRequest() = GET("$videoUrl/cat")
 
     /**
      * Fetch the genres from the source to be used in the filters.
@@ -283,7 +284,7 @@ class RouVideo(
 
     // =========================== Anime Details ============================
 
-    private fun animeUrl(id: String) = "$baseUrl/$VIDEO_SLUG/$id"
+    private fun animeUrl(id: String) = "$videoUrl/$VIDEO_SLUG/$id"
     override fun getAnimeUrl(anime: SAnime) = animeUrl(anime.url)
 
     private val resolutionRegex by lazy { "(Resolution: \\d+p)".toRegex() }
@@ -322,7 +323,7 @@ class RouVideo(
     // ============================== Episodes ==============================
 
     override fun episodeListRequest(anime: SAnime): Request {
-        return GET("$baseUrl/$VIDEO_SLUG/${anime.url}", docHeaders)
+        return GET("$videoUrl/$VIDEO_SLUG/${anime.url}", docHeaders)
     }
 
     override fun episodeListParse(response: Response): List<SEpisode> {
@@ -333,7 +334,7 @@ class RouVideo(
         return listOf(video.toEpisode())
     }
 
-    override fun getEpisodeUrl(episode: SEpisode) = "$baseUrl/$VIDEO_SLUG/${episode.url}"
+    override fun getEpisodeUrl(episode: SEpisode) = "$videoUrl/$VIDEO_SLUG/${episode.url}"
 
     // ============================ Video Links =============================
 
@@ -345,7 +346,7 @@ class RouVideo(
 
         return playlistUtils.extractFromHls(
             playlistUrl = data.videoUrl,
-            referer = "$baseUrl/",
+            referer = "$videoUrl/",
         )
     }
 
