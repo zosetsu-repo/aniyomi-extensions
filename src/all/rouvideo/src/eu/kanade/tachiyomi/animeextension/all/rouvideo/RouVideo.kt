@@ -19,8 +19,10 @@ import eu.kanade.tachiyomi.animesource.online.AnimeHttpSource
 import eu.kanade.tachiyomi.lib.i18n.Intl
 import eu.kanade.tachiyomi.lib.playlistutils.PlaylistUtils
 import eu.kanade.tachiyomi.network.GET
+import eu.kanade.tachiyomi.network.awaitSuccess
 import eu.kanade.tachiyomi.util.asJsoup
 import kotlinx.serialization.json.Json
+import okhttp3.Headers
 import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.Request
 import okhttp3.Response
@@ -118,63 +120,87 @@ class RouVideo : AnimeHttpSource() {
 
     // =============================== Search ===============================
 
-    override fun searchAnimeRequest(page: Int, query: String, filters: AnimeFilterList): Request {
-        fetchTagsList()
-        val categoryFilter = filters.filterIsInstance<RouVideoFilter.CategoryFilter>().firstOrNull()
-        val sortFilter = filters.filterIsInstance<RouVideoFilter.SortFilter>().firstOrNull()
-        val tagFilter = filters.filterIsInstance<RouVideoFilter.TagFilter>().firstOrNull()
-
-        if (query.isBlank() && categoryFilter?.toUriPart() == WATCHING) {
-            return GET(watchingURL, apiHeaders)
-        }
-
-        return GET(
-            baseUrl.toHttpUrl().newBuilder().apply {
-                if (query.isBlank()) {
-                    when {
-                        categoryFilter == null || categoryFilter.toUriPart() == FEATURED ->
-                            addPathSegment("home")
-                        categoryFilter.toUriPart() != ALL_VIDEOS ->
-                            addPathSegments("$CATEGORY_SLUG/${categoryFilter.toUriPart()}")
-                        tagFilter != null && !tagFilter.isEmpty() ->
-                            addPathSegments("$CATEGORY_SLUG/${tagFilter.toUriPart()}")
-                        else ->
-                            addPathSegment(VIDEO_SLUG)
-                    }
-                    sortFilter?.let { addQueryParameter("order", it.toUriPart()) }
-                } else {
-                    addPathSegment("search")
-                    addQueryParameter("q", query)
-                    categoryFilter?.let { addQueryParameter(CATEGORY_SLUG, it.toUriPart()) }
-                }
-                addQueryParameter("page", page.toString())
-            }.build(),
-            docHeaders,
-        )
-    }
-
-    override fun searchAnimeParse(response: Response): AnimesPage {
-        val request = response.request.url
+    override suspend fun getSearchAnime(page: Int, query: String, filters: AnimeFilterList): AnimesPage {
         return when {
-            request.toString().contains(watchingURL) -> {
-                val jsonStr = response.body.string()
-                json.decodeFromString<List<RouVideoDto.Video>>(jsonStr)
-                    .toAnimePage()
+            query.startsWith(PREFIX_ID) -> {
+                val id = query.removePrefix(PREFIX_ID)
+                handleSearchAnime(animeUrl(id), docHeaders) {
+                    AnimesPage(listOf(parseAnimeDetails(this)), false)
+                }
             }
-            request.toString().contains("$baseUrl/home") -> {
-                val document = response.asJsoup()
-                document.selectFirst("script#__NEXT_DATA__")?.data()
-                    ?.let {
-                        json.decodeFromString<RouVideoDto.HotVideoList>(it)
-                            .props.pageProps.toAnimePage()
+            query.startsWith(PREFIX_TAG) -> {
+                val tag = query.removePrefix(PREFIX_TAG)
+                val url = baseUrl.toHttpUrl().newBuilder().apply {
+                    addPathSegments("$CATEGORY_SLUG/$tag")
+                    addQueryParameter("page", page.toString())
+                }.build()
+                handleSearchAnime(url.toString(), docHeaders, ::popularAnimeParse)
+            }
+            else -> {
+                fetchTagsList()
+                val categoryFilter = filters.filterIsInstance<RouVideoFilter.CategoryFilter>().firstOrNull()
+                val sortFilter = filters.filterIsInstance<RouVideoFilter.SortFilter>().firstOrNull()
+                val tagFilter = filters.filterIsInstance<RouVideoFilter.TagFilter>().firstOrNull()
+
+                when {
+                    query.isBlank() && categoryFilter?.toUriPart() == WATCHING ->
+                        handleSearchAnime(watchingURL, apiHeaders) {
+                            val jsonStr = body.string()
+                            json.decodeFromString<List<RouVideoDto.Video>>(jsonStr)
+                                .toAnimePage()
+                        }
+
+                    categoryFilter == null || categoryFilter.toUriPart() == FEATURED ->
+                        handleSearchAnime(featuredURL, docHeaders) {
+                            val document = asJsoup()
+                            document.selectFirst("script#__NEXT_DATA__")?.data()
+                                ?.let {
+                                    json.decodeFromString<RouVideoDto.HotVideoList>(it)
+                                        .props.pageProps.toAnimePage()
+                                }
+                                ?: AnimesPage(emptyList(), false)
+                        }
+
+                    else -> {
+                        val url = baseUrl.toHttpUrl().newBuilder().apply {
+                            if (query.isBlank()) {
+                                when {
+                                    categoryFilter.toUriPart() != ALL_VIDEOS ->
+                                        addPathSegments("$CATEGORY_SLUG/${categoryFilter.toUriPart()}")
+
+                                    tagFilter != null && !tagFilter.isEmpty() ->
+                                        addPathSegments("$CATEGORY_SLUG/${tagFilter.toUriPart()}")
+
+                                    else ->
+                                        addPathSegment(VIDEO_SLUG)
+                                }
+                                sortFilter?.let { addQueryParameter("order", it.toUriPart()) }
+                            } else {
+                                addPathSegment("search")
+                                addQueryParameter("q", query)
+                                addQueryParameter(CATEGORY_SLUG, categoryFilter.toUriPart())
+                            }
+                            addQueryParameter("page", page.toString())
+                        }.build()
+                        handleSearchAnime(url.toString(), docHeaders, ::popularAnimeParse)
                     }
-                    ?: AnimesPage(emptyList(), false)
+                }
             }
-            else -> popularAnimeParse(response)
         }
     }
 
+    private suspend fun handleSearchAnime(url: String, headers: Headers, parse: Response.() -> AnimesPage): AnimesPage {
+        return client.newCall(GET(url, headers))
+            .awaitSuccess()
+            .use(parse)
+    }
+
+    private val featuredURL by lazy { "$baseUrl/home" }
     private val watchingURL by lazy { "$apiUrl/$VIDEO_SLUG/watching" }
+
+    override fun searchAnimeRequest(page: Int, query: String, filters: AnimeFilterList): Request = throw UnsupportedOperationException()
+
+    override fun searchAnimeParse(response: Response): AnimesPage = throw UnsupportedOperationException()
 
     // ============================== Filters ===============================
 
@@ -257,33 +283,41 @@ class RouVideo : AnimeHttpSource() {
 
     // =========================== Anime Details ============================
 
-    override fun getAnimeUrl(anime: SAnime): String = "$baseUrl/$VIDEO_SLUG/${anime.url}"
+    private fun animeUrl(id: String) = "$baseUrl/$VIDEO_SLUG/$id"
+    override fun getAnimeUrl(anime: SAnime) = animeUrl(anime.url)
+
+    private val resolutionRegex by lazy { "(Resolution: \\d+p)".toRegex() }
 
     override suspend fun getAnimeDetails(anime: SAnime): SAnime {
-        val resolutionRegex = "(Resolution: \\d+p)".toRegex()
         val resolution = anime.description?.let { resolutionRegex.find(it) }
             ?.groupValues?.first()
         return client.newCall(animeDetailsRequest(anime))
-            .execute().asJsoup()
-            .let { document ->
-                val data = document.selectFirst("script#__NEXT_DATA__")?.data() ?: return SAnime.create()
-                val video = json.decodeFromString<RouVideoDto.VideoDetails>(data).props.pageProps.video
-
-                savedTags = savedTags.plus(video.getTagList())
-                video.toSAnime()
-                    .apply {
-                        // Search & RelatedVideos doesn't have likeCount while AnimeDetails doesn't have resolution
-                        val resolutionSet = description?.matches(resolutionRegex) ?: false
-                        if (!resolutionSet && !resolution.isNullOrBlank()) {
-                            description = "$resolution\n$description"
-                        }
-                    }
+            .execute()
+            .let { response ->
+                parseAnimeDetails(response, resolution)
             }
     }
 
     override fun animeDetailsRequest(anime: SAnime) = GET(getAnimeUrl(anime), docHeaders)
 
-    override fun animeDetailsParse(response: Response): SAnime = throw UnsupportedOperationException()
+    override fun animeDetailsParse(response: Response): SAnime = parseAnimeDetails(response)
+
+    private fun parseAnimeDetails(response: Response, resolution: String? = null): SAnime {
+        val document = response.asJsoup()
+        val data = document.selectFirst("script#__NEXT_DATA__")?.data() ?: return SAnime.create()
+        val video = json.decodeFromString<RouVideoDto.VideoDetails>(data).props.pageProps.video
+
+        savedTags = savedTags.plus(video.getTagList())
+
+        return video.toSAnime()
+            .apply {
+                // Search & RelatedVideos doesn't have likeCount while AnimeDetails doesn't have resolution
+                val resolutionSet = description?.matches(resolutionRegex) ?: false
+                if (!resolutionSet && !resolution.isNullOrBlank()) {
+                    description = "$resolution\n$description"
+                }
+            }
+    }
 
     // ============================== Episodes ==============================
 
@@ -322,5 +356,8 @@ class RouVideo : AnimeHttpSource() {
         private const val CATEGORY_SLUG = "t"
 
         private const val TAG_LIST_PREF = "TAG_LIST"
+
+        const val PREFIX_ID = "$VIDEO_SLUG:"
+        const val PREFIX_TAG = "$CATEGORY_SLUG:"
     }
 }
