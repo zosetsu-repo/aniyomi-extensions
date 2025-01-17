@@ -2,9 +2,9 @@
 
 just paste this into your anime repo 
 ```
-https://raw.githubusercontent.com/aniku-app/extensions/main/index.min.json
+https://raw.githubusercontent.com/anikku-app/extensions/main/index.min.json
 ```
-If your interested in installing just the apks they can be found [Here](https://github.com/aniku-app/extensions)
+If your interested in installing just the apks they can be found [Here](https://github.com/anikku-app/extensions)
 
 ## Support Server
 
@@ -14,7 +14,7 @@ and please check the discord BEFORE making an issue
 
 ## Contributing
 
-[Template](https://github.com/aniku-app/aniku-extensions/blob/master/CONTRIBUTING.md)
+[Template](https://github.com/anikku-app/anikku-extensions/blob/master/CONTRIBUTING.md)
 
 ## Disclaimer
 

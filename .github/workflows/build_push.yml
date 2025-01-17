@@ -111,7 +111,7 @@ jobs:
 
       - name: Upload APKs (chunk ${{ matrix.chunk }})
         uses: actions/upload-artifact@65c4c4a1ddee5b72f698fdd19549f0f0fb45cf08 # v4
-        if: github.repository == 'aniku-app/aniku-extensions'
+        if: github.repository == 'anikku-app/anikku-extensions'
         with:
           name: "individual-apks-${{ matrix.chunk }}"
           path: "**/*.apk"
@@ -124,7 +124,7 @@ jobs:
     name: Publish repo
     needs:
       - build_individual
-    if: github.repository == 'aniku-app/aniku-extensions'
+    if: github.repository == 'anikku-app/anikku-extensions'
     runs-on: ubuntu-latest
     steps:
       - name: Download APK artifacts
@@ -156,7 +156,7 @@ jobs:
       - name: Checkout repo branch
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
         with:
-          repository: aniku-app/extensions
+          repository: anikku-app/extensions
           token: ${{ secrets.BOT_PAT }}
           ref: main
           path: repo
