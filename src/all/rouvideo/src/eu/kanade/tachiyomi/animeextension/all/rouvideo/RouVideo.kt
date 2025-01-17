@@ -84,6 +84,8 @@ class RouVideo(
 
     override fun popularAnimeRequest(page: Int): Request {
         fetchTagsList()
+        fetchHotSearch()
+
         return GET(
             videoUrl.toHttpUrl().newBuilder().apply {
                 addPathSegment("v")
@@ -107,6 +109,8 @@ class RouVideo(
 
     override fun latestUpdatesRequest(page: Int): Request {
         fetchTagsList()
+        fetchHotSearch()
+
         return GET(
             videoUrl.toHttpUrl().newBuilder().apply {
                 addPathSegment("v")
@@ -139,9 +143,12 @@ class RouVideo(
             }
             else -> {
                 fetchTagsList()
+                fetchHotSearch()
+
                 val categoryFilter = filters.filterIsInstance<RouVideoFilter.CategoryFilter>().firstOrNull()
                 val sortFilter = filters.filterIsInstance<RouVideoFilter.SortFilter>().firstOrNull()
                 val tagFilter = filters.filterIsInstance<RouVideoFilter.TagFilter>().firstOrNull()
+                val hotSearchFilter = filters.filterIsInstance<RouVideoFilter.HotSearchFilter>().firstOrNull()
 
                 when {
                     query.isBlank() && categoryFilter?.toUriPart() == WATCHING ->
@@ -168,6 +175,14 @@ class RouVideo(
                                 when {
                                     categoryFilter.toUriPart() != ALL_VIDEOS ->
                                         addPathSegments("$CATEGORY_SLUG/${categoryFilter.toUriPart()}")
+
+                                    hotSearchFilter != null && !hotSearchFilter.isEmpty() -> {
+                                        addPathSegment("search")
+                                        addQueryParameter("q", hotSearchFilter.toUriPart())
+                                        if (tagFilter != null && !tagFilter.isEmpty()) {
+                                            addQueryParameter(CATEGORY_SLUG, tagFilter.toUriPart())
+                                        }
+                                    }
 
                                     tagFilter != null && !tagFilter.isEmpty() ->
                                         addPathSegments("$CATEGORY_SLUG/${tagFilter.toUriPart()}")
@@ -206,12 +221,11 @@ class RouVideo(
     // ============================== Filters ===============================
 
     override fun getFilterList(): AnimeFilterList {
-        fetchTagsList()
-
         return AnimeFilterList(
             RouVideoFilter.SortFilter(intl),
             AnimeFilter.Header(intl["sort_filter_note"]),
             RouVideoFilter.CategoryFilter(intl),
+            AnimeFilter.Separator(),
             RouVideoFilter.TagFilter(
                 intl,
                 if (!this::tagsArray.isInitialized && savedTags.isEmpty()) {
@@ -221,6 +235,15 @@ class RouVideo(
                         .plus(if (this::tagsArray.isInitialized) tagsArray.toSet() else emptySet())
                         .plus(savedTags.minus(categories(intl)))
                         .toTypedArray()
+                },
+            ),
+            RouVideoFilter.HotSearchFilter(
+                intl,
+                if (!this::hotSearch.isInitialized || hotSearch.isEmpty()) {
+                    setOf(Pair(intl["reset_filter_to_load"], ""))
+                } else {
+                    setOf(Pair(intl["set_video_all_to_filter_tag"], ""))
+                        .plus(hotSearch.map { it to it })
                 },
             ),
         )
@@ -234,7 +257,7 @@ class RouVideo(
     /**
      * The request to the page that have the tags list.
      */
-    private fun tagsListRequest() = GET("$videoUrl/cat")
+    private fun tagsListRequest() = GET("$videoUrl/cat", docHeaders)
 
     /**
      * Fetch the genres from the source to be used in the filters.
@@ -281,6 +304,36 @@ class RouVideo(
             ?.mapNotNull { Tag(it, it) }
             ?.toSet()
             ?: emptySet()
+
+    private lateinit var hotSearch: Set<String>
+
+    private fun hotSearchRequest() = GET("$videoUrl/search", docHeaders)
+
+    private fun fetchHotSearch() {
+        runCatching {
+            client.newCall(hotSearchRequest())
+                .execute()
+                .asJsoup()
+                .let(::hotSearchParse)
+                .let {
+                    hotSearch = if (!this::hotSearch.isInitialized) {
+                        it
+                    } else {
+                        hotSearch.plus(it)
+                    }
+                }
+        }.onFailure { it.printStackTrace() }
+    }
+
+    private fun hotSearchParse(document: Document): Set<String> {
+        return document.selectFirst("script#__NEXT_DATA__")?.data()
+            ?.let {
+                val hotSearches = json.decodeFromString<RouVideoDto.VideoList>(it)
+                    .props.pageProps.hotSearches
+                hotSearches?.toSet()
+            }
+            ?: emptySet()
+    }
 
     // =========================== Anime Details ============================
 

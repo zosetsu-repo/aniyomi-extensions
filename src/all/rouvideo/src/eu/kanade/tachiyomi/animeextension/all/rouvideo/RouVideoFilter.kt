@@ -20,6 +20,11 @@ internal object RouVideoFilter {
         tags,
     )
 
+    class HotSearchFilter(intl: Intl, keywords: Set<Pair<String, String>>) : UriPartFilter(
+        intl["hot_search"],
+        keywords.toTypedArray(),
+    )
+
     class SortFilter(intl: Intl) : UriPartFilter(
         intl["sort"],
         arrayOf(
