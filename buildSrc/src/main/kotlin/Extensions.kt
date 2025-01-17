@@ -1,3 +1,4 @@
+import groovy.lang.MissingPropertyException
 import org.gradle.api.plugins.ExtensionAware
 import org.gradle.kotlin.dsl.extra
 
