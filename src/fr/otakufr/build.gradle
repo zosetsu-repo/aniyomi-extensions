@@ -15,5 +15,5 @@ dependencies {
     implementation(project(':lib:okru-extractor'))
     implementation(project(":lib:playlist-utils"))
     implementation(project(":lib:upstream-extractor"))
-    implementation libs.jsunpacker
+    implementation(libs.jsunpacker)
 }
