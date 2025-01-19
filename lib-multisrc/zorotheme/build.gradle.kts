@@ -1,4 +1,4 @@
-kmkBaseVersionCode = 1
+baseKmkVersionCode = 1
 plugins {
     id("lib-multisrc")
 }
