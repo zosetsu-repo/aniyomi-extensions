@@ -10,7 +10,10 @@
     "gradle/**",
     ".github/**"
   ],
-  "ignoreDeps": ["aniyomiorg/issue-moderator-action"],
+  "ignoreDeps": [
+    "aniyomiorg/issue-moderator-action",
+    "com.github.mihonapp:injekt"
+  ],
   "packageRules": [
     {
       "matchManagers": ["github-actions"],
