@@ -1,7 +1,7 @@
 [versions]
 # NOTE: Don't upgrade `com.android.tools.build:gradle` version higher than `aniyomi-lib`
 agp_version = "8.2.1"
-coroutines_version = "1.7.1"
+coroutines_version = "1.10.1"
 kotlin_version = "1.8.22"
 serialization_version = "1.5.1"
 jsunpackerVersion = "1.0.1"
