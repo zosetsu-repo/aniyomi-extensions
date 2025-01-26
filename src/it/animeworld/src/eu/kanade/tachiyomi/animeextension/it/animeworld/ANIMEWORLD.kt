@@ -27,7 +27,6 @@ import org.jsoup.nodes.Element
 import uy.kohesive.injekt.Injekt
 import uy.kohesive.injekt.api.get
 import uy.kohesive.injekt.injectLazy
-import java.lang.Exception
 
 class ANIMEWORLD : ConfigurableAnimeSource, ParsedAnimeHttpSource() {
 
@@ -40,6 +39,11 @@ class ANIMEWORLD : ConfigurableAnimeSource, ParsedAnimeHttpSource() {
     override val lang = "it"
 
     override val supportsLatest = true
+    override val client by lazy {
+        network.client.newBuilder()
+            .addInterceptor(ShittyRedirectionInterceptor(network.client))
+            .build()
+    }
 
     private val json: Json by injectLazy()
 
@@ -136,7 +140,7 @@ class ANIMEWORLD : ConfigurableAnimeSource, ParsedAnimeHttpSource() {
                     listOf(Video(url, "AnimeWorld Server", url))
                 }
                 url.contains("https://doo") -> {
-                    DoodExtractor(client).videoFromUrl(url)
+                    DoodExtractor(client).videoFromUrl(url, redirect = true)
                         ?.let(::listOf)
                 }
                 url.contains("streamtape") -> {
@@ -336,6 +340,9 @@ class ANIMEWORLD : ConfigurableAnimeSource, ParsedAnimeHttpSource() {
         Year("2020"),
         Year("2021"),
         Year("2022"),
+        Year("2023"),
+        Year("2024"),
+        Year("2025"),
     )
 
     internal class Type(val id: String, name: String) : AnimeFilter.CheckBox(name)
