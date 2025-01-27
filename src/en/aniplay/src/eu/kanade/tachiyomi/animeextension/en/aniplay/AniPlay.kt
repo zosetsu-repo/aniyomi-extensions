@@ -267,7 +267,12 @@ class AniPlay : AniListAnimeHttpSource(), ConfigurableAnimeSource {
 
         val subtitles = episodeData.response.subtitles
             ?.filter { it.lang?.lowercase() != "thumbnails" }
-            ?.map { Track(it.url ?: throw Exception("episodeData.response.subtitles.url is null ($it)"), it.lang ?: "Unk") }
+            ?.map {
+                Track(
+                    it.url ?: throw Exception("episodeData.response.subtitles.url is null ($it)"),
+                    it.lang ?: "Unk",
+                )
+            }
             ?: emptyList()
 
         val serverName = getServerName(episodeData.source)

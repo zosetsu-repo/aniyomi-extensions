@@ -27,7 +27,6 @@ import org.jsoup.nodes.Element
 import uy.kohesive.injekt.Injekt
 import uy.kohesive.injekt.api.get
 import uy.kohesive.injekt.injectLazy
-import java.lang.Exception
 
 class ANIMEWORLD : ConfigurableAnimeSource, ParsedAnimeHttpSource() {
 
@@ -141,7 +140,7 @@ class ANIMEWORLD : ConfigurableAnimeSource, ParsedAnimeHttpSource() {
                     listOf(Video(url, "AnimeWorld Server", url))
                 }
                 url.contains("https://doo") -> {
-                    DoodExtractor(client).videoFromUrl(url)
+                    DoodExtractor(client).videoFromUrl(url, redirect = true)
                         ?.let(::listOf)
                 }
                 url.contains("streamtape") -> {
