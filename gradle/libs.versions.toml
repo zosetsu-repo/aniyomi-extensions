@@ -1,5 +1,5 @@
 [versions]
-agp_version = "8.6.1"
+agp_version = "8.2.1"
 coroutines_version = "1.7.1"
 kotlin_version = "1.9.25"
 serialization_version = "1.5.1"
