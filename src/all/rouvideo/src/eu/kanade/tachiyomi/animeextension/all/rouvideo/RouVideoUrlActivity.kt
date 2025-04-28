@@ -24,7 +24,7 @@ class RouVideoUrlActivity : Activity() {
 
             val mainIntent = Intent().apply {
                 action = "eu.kanade.tachiyomi.ANIMESEARCH"
-                putExtra("query", "$type:$item")
+                putExtra("q", "$type:$item")
                 putExtra("filter", packageName)
             }
 
