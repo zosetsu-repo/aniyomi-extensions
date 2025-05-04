@@ -28,7 +28,6 @@ jobs:
 
       - name: Set env
         run: |
-          echo "MERGED_COMMIT_MESSAGE=Merge remote-tracking branch 'origin/kohiden'" >> $GITHUB_ENV
           echo "LATEST_COMMIT_MESSAGE<<{delimiter}
           $(git log -1 --pretty=%B)
 
@@ -46,7 +45,7 @@ jobs:
 
       # This step is to alert whether a bumping version might occur.
       - name: Bump extensions that uses a modified lib
-        if: steps.modified-libs.outputs.any_changed == 'true' && github.event.head_commit.message != ${{ env.MERGED_COMMIT_MESSAGE }}
+        if: steps.modified-libs.outputs.any_changed == 'true' && !startsWith(github.event.pull_request.title, '[skip mass-bump]')
         run: |
           latest_commit_author=$(git log -1 --pretty=%an)
           isKmk=false
