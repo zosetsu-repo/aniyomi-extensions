@@ -84,7 +84,7 @@ class RouVideo(
 
     override fun popularAnimeRequest(page: Int): Request {
         fetchTagsListOnce()
-        updateHotSearch()
+        if (page == 0) updateHotSearch()
 
         return GET(
             videoUrl.toHttpUrl().newBuilder().apply {
@@ -109,7 +109,7 @@ class RouVideo(
 
     override fun latestUpdatesRequest(page: Int): Request {
         fetchTagsListOnce()
-        updateHotSearch()
+        if (page == 0) updateHotSearch()
 
         return GET(
             videoUrl.toHttpUrl().newBuilder().apply {
@@ -146,7 +146,7 @@ class RouVideo(
 
         // For other search/browse types, ensure tags and hot searches are fetched
         fetchTagsListOnce()
-        updateHotSearch()
+        if (page == 0) updateHotSearch()
 
         val categoryFilter = filters.filterIsInstance<RouVideoFilter.CategoryFilter>().firstOrNull()
         val sortFilter = filters.filterIsInstance<RouVideoFilter.SortFilter>().firstOrNull()
