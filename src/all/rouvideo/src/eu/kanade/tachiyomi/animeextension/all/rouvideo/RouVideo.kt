@@ -21,6 +21,7 @@ import eu.kanade.tachiyomi.lib.playlistutils.PlaylistUtils
 import eu.kanade.tachiyomi.network.GET
 import eu.kanade.tachiyomi.network.awaitSuccess
 import eu.kanade.tachiyomi.util.asJsoup
+import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
 import okhttp3.Headers
 import okhttp3.HttpUrl.Companion.toHttpUrl
@@ -103,6 +104,22 @@ class RouVideo(
 
         return json.decodeFromString<RouVideoDto.VideoList>(data)
             .props.pageProps.toAnimePage()
+    }
+
+    override fun relatedAnimeListParse(response: Response): List<SAnime> {
+        val document = response.asJsoup()
+        val data = document.selectFirst("script#__NEXT_DATA__")?.data()
+            ?: return emptyList()
+
+        val watching = runBlocking {
+            handleSearchAnime(watchingURL, apiHeaders) {
+                json.decodeFromString<List<RouVideoDto.Video>>(body.string()).toAnimePage()
+            }
+        }
+            .animes
+
+        return json.decodeFromString<RouVideoDto.VideoDetails>(data)
+            .props.pageProps.relatedVideos.map { video -> video.toSAnime() } + watching
     }
 
     // =============================== Latest ===============================
