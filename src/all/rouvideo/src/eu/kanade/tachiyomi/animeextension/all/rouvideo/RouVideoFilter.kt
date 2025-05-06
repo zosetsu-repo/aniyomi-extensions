@@ -8,6 +8,7 @@ internal object RouVideoFilter {
     class CategoryFilter(intl: Intl) : UriPartFilter(
         intl["category"],
         arrayOf(
+            Tag("<${intl["category"]}>", ""),
             Tag(intl["featured"], FEATURED),
             Tag(intl["other_watching"], WATCHING),
         )

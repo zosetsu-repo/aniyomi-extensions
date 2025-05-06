@@ -158,7 +158,8 @@ class RouVideo(
                                 .toAnimePage()
                         }
 
-                    categoryFilter == null || categoryFilter.toUriPart() == FEATURED ->
+                    categoryFilter?.toUriPart() == FEATURED ||
+                        query.isBlank() && (categoryFilter == null || categoryFilter.toUriPart() == "") ->
                         handleSearchAnime(featuredURL, docHeaders) {
                             val document = asJsoup()
                             document.selectFirst("script#__NEXT_DATA__")?.data()
@@ -173,8 +174,8 @@ class RouVideo(
                         val url = videoUrl.toHttpUrl().newBuilder().apply {
                             if (query.isBlank()) {
                                 when {
-                                    categoryFilter.toUriPart() != ALL_VIDEOS ->
-                                        addPathSegments("$CATEGORY_SLUG/${categoryFilter.toUriPart()}")
+                                    categoryFilter?.toUriPart() != ALL_VIDEOS ->
+                                        addPathSegments("$CATEGORY_SLUG/${categoryFilter?.toUriPart()}")
 
                                     hotSearchFilter != null && !hotSearchFilter.isEmpty() -> {
                                         addPathSegment("search")
@@ -194,7 +195,9 @@ class RouVideo(
                             } else {
                                 addPathSegment("search")
                                 addQueryParameter("q", query)
-                                addQueryParameter(CATEGORY_SLUG, categoryFilter.toUriPart())
+                                if (categoryFilter != null && categoryFilter.toUriPart() != "") {
+                                    addQueryParameter(CATEGORY_SLUG, categoryFilter.toUriPart())
+                                }
                             }
                             addQueryParameter("page", page.toString())
                         }.build()
