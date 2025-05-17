@@ -182,7 +182,7 @@ class AllAnime : ConfigurableAnimeSource, AnimeHttpSource() {
         val slugTime = if (time.isNotEmpty()) "-st-$time" else time
         val siteUrl = preferences.siteUrl
 
-        return "$siteUrl/anime/$id/$slug$slugTime"
+        return "$siteUrl/bangumi/$id"
     }
 
     override fun animeDetailsParse(response: Response): SAnime {
@@ -481,7 +481,7 @@ class AllAnime : ConfigurableAnimeSource, AnimeHttpSource() {
         )
 
         private const val PREF_SITE_DOMAIN_KEY = "preferred_site_domain"
-        private const val PREF_SITE_DOMAIN_DEFAULT = "https://allanime.to"
+        private const val PREF_SITE_DOMAIN_DEFAULT = "https://allmanga.to"
 
         private const val PREF_DOMAIN_KEY = "preferred_domain"
         private const val PREF_DOMAIN_DEFAULT = "https://api.allanime.day"
