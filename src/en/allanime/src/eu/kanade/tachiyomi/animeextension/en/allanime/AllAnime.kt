@@ -46,7 +46,9 @@ class AllAnime : ConfigurableAnimeSource, AnimeHttpSource() {
 
     override val name = "AllAnime"
 
-    override val baseUrl by lazy { preferences.baseUrl }
+    override val baseUrl by lazy { "${preferences.siteUrl}/anime" }
+
+    private val apiUrl by lazy { preferences.apiUrl }
 
     override val lang = "en"
 
@@ -259,12 +261,12 @@ class AllAnime : ConfigurableAnimeSource, AnimeHttpSource() {
             add("Accept", "*/*")
             add("Content-Length", payload.contentLength().toString())
             add("Content-Type", payload.contentType().toString())
-            add("Host", baseUrl.toHttpUrl().host)
+            add("Host", apiUrl.toHttpUrl().host)
             add("Origin", siteUrl)
-            add("Referer", "$baseUrl/")
+            add("Referer", "$apiUrl/")
         }.build()
 
-        return POST("$baseUrl/api", headers = postHeaders, body = payload)
+        return POST("$apiUrl/api", headers = postHeaders, body = payload)
     }
 
     private val allAnimeExtractor by lazy { AllAnimeExtractor(client, headers, preferences.siteUrl) }
@@ -411,12 +413,12 @@ class AllAnime : ConfigurableAnimeSource, AnimeHttpSource() {
             add("Accept", "*/*")
             add("Content-Length", payload.contentLength().toString())
             add("Content-Type", payload.contentType().toString())
-            add("Host", baseUrl.toHttpUrl().host)
+            add("Host", apiUrl.toHttpUrl().host)
             add("Origin", siteUrl)
-            add("Referer", "$baseUrl/")
+            add("Referer", "$apiUrl/")
         }.build()
 
-        return POST("$baseUrl/api", headers = postHeaders, body = payload)
+        return POST("$apiUrl/api", headers = postHeaders, body = payload)
     }
 
     data class Server(
@@ -656,7 +658,7 @@ class AllAnime : ConfigurableAnimeSource, AnimeHttpSource() {
     private val SharedPreferences.subPref
         get() = getString(PREF_SUB_KEY, PREF_SUB_DEFAULT)!!
 
-    private val SharedPreferences.baseUrl
+    private val SharedPreferences.apiUrl
         get() = getString(PREF_DOMAIN_KEY, PREF_DOMAIN_DEFAULT)!!
 
     private val SharedPreferences.siteUrl
