@@ -165,7 +165,9 @@ class AllAnime : ConfigurableAnimeSource, AnimeHttpSource() {
     override fun searchAnimeParse(response: Response): AnimesPage = parseAnime(response)
 
     override fun relatedAnimeListRequest(anime: SAnime): Request {
-        val genres = anime.genre?.split(", ").orEmpty().toJsonString()
+        val genres = anime.genre?.split(",").orEmpty()
+            .map { it.trim() }
+            .toJsonString()
         val data = buildJsonObject {
             putJsonObject("variables") {
                 putJsonObject("search") {
