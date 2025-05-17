@@ -86,7 +86,7 @@ class AllAnime : ConfigurableAnimeSource, AnimeHttpSource() {
                     "eng" -> it.anyCard!!.englishName ?: it.anyCard.name
                     else -> it.anyCard!!.nativeName ?: it.anyCard.name
                 }
-                thumbnail_url = it.anyCard.thumbnail
+                thumbnail_url = thumbnailUrl(it.anyCard.thumbnail)
                 url = "${it.anyCard._id}<&sep>${it.anyCard.slugTime ?: ""}<&sep>${it.anyCard.name.slugify()}"
             }
         }
@@ -475,12 +475,20 @@ class AllAnime : ConfigurableAnimeSource, AnimeHttpSource() {
                     "eng" -> ani.englishName ?: ani.name
                     else -> ani.nativeName ?: ani.name
                 }
-                thumbnail_url = ani.thumbnail
+                thumbnail_url = thumbnailUrl(ani.thumbnail)
                 url = "${ani._id}<&sep>${ani.slugTime ?: ""}<&sep>${ani.name.slugify()}"
             }
         }
 
         return AnimesPage(animeList, animeList.size == PAGE_SIZE)
+    }
+
+    private fun thumbnailUrl(url: String): String {
+        return if (url.startsWith("https://")) {
+            THUMBNAIL_PROXY.format(url.removePrefix("https://"))
+        } else {
+            THUMBNAIL_PROXY_SUB.format(url)
+        }
     }
 
     private fun String.containsAny(keywords: List<String>): Boolean {
@@ -504,6 +512,9 @@ class AllAnime : ConfigurableAnimeSource, AnimeHttpSource() {
             "filemoon",
             "streamwish",
         )
+
+        private const val THUMBNAIL_PROXY = "https://wp.youtube-anime.com/%s?w=250"
+        private const val THUMBNAIL_PROXY_SUB = "https://wp.youtube-anime.com/aln.youtube-anime.com/%s?w=250"
 
         private const val PREF_SITE_DOMAIN_KEY = "preferred_site_domain"
         private const val PREF_SITE_DOMAIN_DEFAULT = "https://allmanga.to"
