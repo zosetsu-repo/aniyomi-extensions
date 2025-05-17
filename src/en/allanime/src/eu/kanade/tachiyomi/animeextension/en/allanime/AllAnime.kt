@@ -25,6 +25,7 @@ import eu.kanade.tachiyomi.network.POST
 import eu.kanade.tachiyomi.network.await
 import eu.kanade.tachiyomi.util.parallelCatchingFlatMap
 import eu.kanade.tachiyomi.util.parseAs
+import keiyoushi.utils.toJsonString
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
@@ -99,8 +100,8 @@ class AllAnime : ConfigurableAnimeSource, AnimeHttpSource() {
         val data = buildJsonObject {
             putJsonObject("variables") {
                 putJsonObject("search") {
-                    put("allowAdult", false)
-                    put("allowUnknown", false)
+                    put("allowAdult", true)
+                    put("allowUnknown", true)
                 }
                 put("limit", PAGE_SIZE)
                 put("page", page)
@@ -124,8 +125,8 @@ class AllAnime : ConfigurableAnimeSource, AnimeHttpSource() {
                 putJsonObject("variables") {
                     putJsonObject("search") {
                         put("query", query)
-                        put("allowAdult", false)
-                        put("allowUnknown", false)
+                        put("allowAdult", true)
+                        put("allowUnknown", true)
                     }
                     put("limit", PAGE_SIZE)
                     put("page", page)
@@ -139,8 +140,8 @@ class AllAnime : ConfigurableAnimeSource, AnimeHttpSource() {
             val data = buildJsonObject {
                 putJsonObject("variables") {
                     putJsonObject("search") {
-                        put("allowAdult", false)
-                        put("allowUnknown", false)
+                        put("allowAdult", true)
+                        put("allowUnknown", true)
                         if (filters.season != "all") put("season", filters.season)
                         if (filters.releaseYear != "all") put("year", filters.releaseYear.toInt())
                         if (filters.genres != "all") {
@@ -162,6 +163,28 @@ class AllAnime : ConfigurableAnimeSource, AnimeHttpSource() {
     }
 
     override fun searchAnimeParse(response: Response): AnimesPage = parseAnime(response)
+
+    override fun relatedAnimeListRequest(anime: SAnime): Request {
+        val genres = anime.genre?.split(", ").orEmpty().toJsonString()
+        val data = buildJsonObject {
+            putJsonObject("variables") {
+                putJsonObject("search") {
+                    put("allowAdult", true)
+                    put("allowUnknown", true)
+                    put("genres", json.decodeFromString(genres))
+                }
+                put("limit", PAGE_SIZE)
+                put("page", 1)
+                put("translationType", preferences.subPref)
+            }
+            put("query", SEARCH_QUERY)
+        }
+        return buildPost(data)
+    }
+
+    override fun relatedAnimeListParse(response: Response): List<SAnime> {
+        return parseAnime(response).animes
+    }
 
     // ============================== Filters ===============================
 
