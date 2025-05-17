@@ -161,7 +161,7 @@ abstract class ZoroTheme(
         return if (full && value != null) "\n$tag $value" else value
     }
 
-    fun parseStatus(statusString: String?): Int {
+    protected fun parseStatus(statusString: String?): Int {
         return when (statusString) {
             "Currently Airing" -> SAnime.ONGOING
             "Finished Airing" -> SAnime.COMPLETED
