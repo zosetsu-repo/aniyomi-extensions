@@ -18,6 +18,7 @@ class NineAnimeTv : ZoroTheme(
     "9AnimeTV",
     "https://9animetv.to",
     hosterNames = listOf(
+        "DouVideo",
         "Vidstreaming",
         "Vidcloud",
     ),
@@ -96,7 +97,7 @@ class NineAnimeTv : ZoroTheme(
 
     override fun extractVideo(server: VideoData): List<Video> {
         return when (server.name) {
-            "Vidstreaming", "Vidcloud" -> megaCloudExtractor.getVideosFromUrl(server.link, server.type, server.name)
+            "DouVideo", "Vidstreaming", "Vidcloud" -> megaCloudExtractor.getVideosFromUrl(server.link, server.type, server.name)
             else -> emptyList()
         }
     }
