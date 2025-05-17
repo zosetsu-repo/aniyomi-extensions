@@ -41,8 +41,8 @@ class MegaCloudExtractor(
         private val SOURCES_URL = arrayOf("/embed-2/ajax/e-1/getSources?id=", "/ajax/embed-6-v2/getSources?id=")
         private val SOURCES_SPLITTER = arrayOf("/e-1/", "/embed-6-v2/")
         private val SOURCES_KEY = arrayOf("1", "6")
-        private const val E1_SCRIPT_URL = "https://megacloud.tv/js/player/a/prod/e1-player.min.js"
-        private const val E6_SCRIPT_URL = "https://rapid-cloud.co/js/player/prod/e6-player-v2.min.js"
+        private const val E1_SCRIPT_URL = "https://megacloud.tv/js/player/a/e1-player.min.js"
+        private const val E6_SCRIPT_URL = "https://rapid-cloud.co/js/player/e6-player-v2.min.js"
         private val MUTEX = Mutex()
         private var shouldUpdateKey = false
         private const val PREF_KEY_KEY = "megacloud_key_"

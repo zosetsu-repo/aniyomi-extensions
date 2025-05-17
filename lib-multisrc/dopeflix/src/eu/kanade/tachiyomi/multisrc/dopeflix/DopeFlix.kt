@@ -13,11 +13,13 @@ import eu.kanade.tachiyomi.animesource.model.Video
 import eu.kanade.tachiyomi.animesource.online.ParsedAnimeHttpSource
 import eu.kanade.tachiyomi.lib.doodextractor.DoodExtractor
 import eu.kanade.tachiyomi.lib.playlistutils.PlaylistUtils
+import eu.kanade.tachiyomi.multisrc.dopeflix.dto.SourcesResponse
 import eu.kanade.tachiyomi.multisrc.dopeflix.dto.VideoDto
 import eu.kanade.tachiyomi.multisrc.dopeflix.extractors.DopeFlixExtractor
 import eu.kanade.tachiyomi.network.GET
 import eu.kanade.tachiyomi.util.asJsoup
 import eu.kanade.tachiyomi.util.parallelCatchingFlatMapBlocking
+import eu.kanade.tachiyomi.util.parseAs
 import okhttp3.Headers
 import okhttp3.HttpUrl
 import okhttp3.HttpUrl.Companion.toHttpUrl
@@ -133,7 +135,7 @@ abstract class DopeFlix(
         val id = infoElement.attr("data-id")
         val dataType = infoElement.attr("data-type") // Tv = 2 or movie = 1
         return if (dataType == "2") {
-            val seasonUrl = "$baseUrl/ajax/v2/tv/seasons/$id"
+            val seasonUrl = "$baseUrl/ajax/tv/seasons/$id"
             val seasonsHtml = client.newCall(
                 GET(
                     seasonUrl,
@@ -145,7 +147,7 @@ abstract class DopeFlix(
                 .flatMap(::parseEpisodesFromSeries)
                 .reversed()
         } else {
-            val movieUrl = "$baseUrl/ajax/movie/episodes/$id"
+            val movieUrl = "$baseUrl/ajax/episode/list/$id"
             SEpisode.create().apply {
                 name = document.selectFirst("h2.heading-name")!!.text()
                 episode_number = 1F
@@ -159,7 +161,7 @@ abstract class DopeFlix(
     private fun parseEpisodesFromSeries(element: Element): List<SEpisode> {
         val seasonId = element.attr("data-id")
         val seasonName = element.text()
-        val episodesUrl = "$baseUrl/ajax/v2/season/episodes/$seasonId"
+        val episodesUrl = "$baseUrl/ajax/season/episodes/$seasonId"
         val episodesHtml = client.newCall(GET(episodesUrl)).execute()
             .asJsoup()
         val episodeElements = episodesHtml.select("div.eps-item")
@@ -172,7 +174,7 @@ abstract class DopeFlix(
         val epName = element.selectFirst("h3.film-name a")!!.text()
         name = "$seasonName $epNum $epName"
         episode_number = "${seasonName.getNumber()}.${epNum.getNumber().padStart(3, '0')}".toFloatOrNull() ?: 1F
-        setUrlWithoutDomain("$baseUrl/ajax/v2/episode/servers/$episodeId")
+        setUrlWithoutDomain("$baseUrl/ajax/episode/servers/$episodeId")
     }
 
     private fun String.getNumber() = filter(Char::isDigit)
@@ -188,11 +190,9 @@ abstract class DopeFlix(
             .parallelCatchingFlatMapBlocking { server ->
                 val name = server.selectFirst("span")!!.text()
                 val id = server.attr("data-id")
-                val url = "$baseUrl/ajax/sources/$id"
-                val reqBody = client.newCall(GET(url, episodeReferer)).execute()
-                    .body.string()
-                val sourceUrl = reqBody.substringAfter("\"link\":\"")
-                    .substringBefore("\"")
+                val url = "$baseUrl/ajax/episode/sources/$id"
+                val sourceUrl = client.newCall(GET(url, episodeReferer)).execute()
+                    .body.string().parseAs<SourcesResponse>().link ?: ""
                 when {
                     "DoodStream" in name ->
                         DoodExtractor(client).videoFromUrl(sourceUrl)
