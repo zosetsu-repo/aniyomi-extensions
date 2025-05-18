@@ -37,6 +37,12 @@ class StreamingCommunity(override val lang: String, private val showType: String
 
     override val client: OkHttpClient = network.client
 
+    private val apiHeaders = headers.newBuilder()
+        .add("Accept", "application/json, text/plain, */*")
+        .add("Host", baseUrl.toHttpUrl().host)
+        .add("Referer", "$baseUrl/browse/trending")
+        .build()
+
     private val json: Json by injectLazy()
 
     private val preferences: SharedPreferences by lazy {
@@ -46,27 +52,23 @@ class StreamingCommunity(override val lang: String, private val showType: String
     // ============================== Popular ===============================
 
     override fun popularAnimeRequest(page: Int): Request {
-        return if (page == 1) {
-            GET("$baseUrl/browse/trending", headers)
-        } else {
-            val apiHeaders = headers.newBuilder()
-                .add("Accept", "application/json, text/plain, */*")
-                .add("Host", baseUrl.toHttpUrl().host)
-                .add("Referer", "$baseUrl/browse/trending")
-                .build()
-            GET("$baseUrl/api/browse/trending?offset=${(page - 1) * 60}", headers = apiHeaders)
+        return when (page) {
+            1 -> GET("$baseUrl/browse/top10?type=$showType", headers)
+            2 -> GET("$baseUrl/browse/trending", headers)
+            else ->
+                GET("$baseUrl/api/browse/trending?offset=${(page - 1) * 60}", headers = apiHeaders)
         }
     }
 
     override fun popularAnimeParse(response: Response): AnimesPage {
-        val parsed = if (response.request.url.encodedPath.startsWith("/api/")) {
+        val parsed: PropObject = if (response.request.url.encodedPath.startsWith("/api/")) {
             json.decodeFromString(response.body.string())
         } else {
             val data = response.asJsoup().getData()
             json.decodeFromString<ShowsResponse>(data).props
         }
 
-        val imageUrl = "https://cdn.${baseUrl.toHttpUrl().host}/images/"
+        val imageUrl = "${parsed.cdn_url}/images/"
 
         val animeList = parsed.titles.map { item ->
             SAnime.create().apply {
@@ -78,6 +80,10 @@ class StreamingCommunity(override val lang: String, private val showType: String
                     imageUrl + it.filename
                 } ?: item.images.firstOrNull {
                     it.type == "cover"
+                }?.let {
+                    imageUrl + it.filename
+                } ?: item.images.firstOrNull {
+                    it.type == "cover_mobile"
                 }?.let {
                     imageUrl + it.filename
                 } ?: item.images.firstOrNull {

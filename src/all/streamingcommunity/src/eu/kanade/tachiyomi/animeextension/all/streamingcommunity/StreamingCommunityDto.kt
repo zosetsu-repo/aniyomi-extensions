@@ -11,6 +11,9 @@ data class ShowsResponse(
 @Serializable
 data class PropObject(
     val titles: List<TitleObject>,
+    val scws_url: String, // https://vixcloud.co
+    val cdn_url: String, // https://cdn.streamingunity.to
+    val browseMoreApiRoute: String, // "https://streamingunity.to/api/browse/top10?type=movie"
 ) {
     @Serializable
     data class TitleObject(
@@ -18,11 +21,13 @@ data class PropObject(
         val slug: String,
         val name: String,
         val images: List<ImageObject>,
+        val score: String, // "7.7"
+        val last_air_date: String, // "2003-09-06"
     ) {
         @Serializable
         data class ImageObject(
             val filename: String,
-            val type: String,
+            val type: String, // poster, cover, background, logo, cover_mobile
         )
     }
 }
