@@ -6,14 +6,15 @@ import kotlinx.serialization.Serializable
 @Serializable
 data class ShowsResponse(
     val props: PropObject,
+    val version: String, // x-inertia-version
 )
 
 @Serializable
 data class PropObject(
     val titles: List<TitleObject>,
-    val scws_url: String, // https://vixcloud.co
-    val cdn_url: String, // https://cdn.streamingunity.to
-    val browseMoreApiRoute: String, // "https://streamingunity.to/api/browse/top10?type=movie"
+    val scws_url: String?, // https://vixcloud.co (not available in API call)
+    val cdn_url: String?, // https://cdn.streamingunity.to (not available in API call)
+    val browseMoreApiRoute: String?, // "https://streamingunity.to/api/browse/top10?type=movie" (not available in API call)
 ) {
     @Serializable
     data class TitleObject(
@@ -22,7 +23,7 @@ data class PropObject(
         val name: String,
         val images: List<ImageObject>,
         val score: String, // "7.7"
-        val last_air_date: String, // "2003-09-06"
+        val last_air_date: String?, // "2003-09-06"
     ) {
         @Serializable
         data class ImageObject(
@@ -35,7 +36,7 @@ data class PropObject(
 @Serializable
 data class SingleShowResponse(
     val props: SingleShowObject,
-    val version: String? = null,
+    val version: String? = null, // x-inertia-version
 ) {
     @Serializable
     data class SingleShowObject(

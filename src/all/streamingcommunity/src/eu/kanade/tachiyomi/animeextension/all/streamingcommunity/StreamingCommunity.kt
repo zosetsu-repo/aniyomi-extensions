@@ -30,7 +30,9 @@ class StreamingCommunity(override val lang: String, private val showType: String
 
     override val name = "StreamingUnity (${showType.replaceFirstChar { it.uppercaseChar() }})"
 
-    override val baseUrl = "https://streamingunity.to/$lang"
+    private val homepage = "https://streamingunity.to"
+    override val baseUrl = "$homepage/$lang"
+    private val apiUrl = "$homepage/api"
 
     override val supportsLatest = true
 
@@ -38,8 +40,19 @@ class StreamingCommunity(override val lang: String, private val showType: String
 
     private val apiHeaders = headers.newBuilder()
         .add("Accept", "application/json, text/plain, */*")
+        .add("Sec-Fetch-Mode", "cors")
         .add("Host", baseUrl.toHttpUrl().host)
-        .add("Referer", "$baseUrl/browse/trending")
+        .add("Referer", baseUrl)
+        .build()
+
+    private val jsonHeaders = headers.newBuilder()
+        .add("Accept", "text/html, application/xhtml+xml")
+        .add("X-Requested-With", "XMLHttpRequest")
+        .add("Sec-Fetch-Mode", "cors")
+        .add("X-Inertia", "true")
+        .add("x-inertia-version", "0e290f93f72ff53cf96ae7d71a94b0fc")
+        .add("Host", baseUrl.toHttpUrl().host)
+        .add("Referer", baseUrl)
         .build()
 
     private val json: Json by injectLazy()
@@ -54,22 +67,23 @@ class StreamingCommunity(override val lang: String, private val showType: String
 
     override fun popularAnimeRequest(page: Int): Request {
         return when (page) {
-            1 -> GET("$baseUrl/browse/top10?type=$showType", headers)
-            2 -> GET("$baseUrl/browse/trending", headers)
+            1 -> GET("$baseUrl/browse/top10?lang=$lang&type=$showType", jsonHeaders)
+            2 -> GET("$baseUrl/browse/trending?lang=$lang&type=$showType", jsonHeaders)
             else ->
-                GET("$baseUrl/api/browse/trending?offset=${(page - 1) * 60}", headers = apiHeaders)
+                GET("$apiUrl/archive?lang=$lang&offset=${(page - 3) * 60}&sort=views&type=$showType", headers = apiHeaders)
         }
     }
 
-    override fun popularAnimeParse(response: Response): AnimesPage {
-        val parsed: PropObject = if (response.request.url.encodedPath.startsWith("/api/")) {
-            json.decodeFromString(response.body.string())
-        } else {
-            val data = response.asJsoup().getData()
-            json.decodeFromString<ShowsResponse>(data).props
-        }
+    private var imageCdn = "https://cdn.${baseUrl.toHttpUrl().host}/images/"
 
-        val imageUrl = "${parsed.cdn_url}/images/"
+    override fun popularAnimeParse(response: Response): AnimesPage {
+        val isApiCall = response.request.url.encodedPath.startsWith("/api/")
+        val parsed: PropObject = if (isApiCall) {
+            json.decodeFromString<PropObject>(response.body.string())
+        } else {
+            json.decodeFromString<ShowsResponse>(response.body.string()).props
+                .also { imageCdn = "${it.cdn_url}/images/" }
+        }
 
         val animeList = parsed.titles.map { item ->
             SAnime.create().apply {
@@ -78,26 +92,24 @@ class StreamingCommunity(override val lang: String, private val showType: String
                 thumbnail_url = item.images.firstOrNull {
                     it.type == "poster"
                 }?.let {
-                    imageUrl + it.filename
+                    imageCdn + it.filename
                 } ?: item.images.firstOrNull {
                     it.type == "cover"
                 }?.let {
-                    imageUrl + it.filename
+                    imageCdn + it.filename
                 } ?: item.images.firstOrNull {
                     it.type == "cover_mobile"
                 }?.let {
-                    imageUrl + it.filename
+                    imageCdn + it.filename
                 } ?: item.images.firstOrNull {
                     it.type == "background"
                 }?.let {
-                    imageUrl + it.filename
+                    imageCdn + it.filename
                 }
             }
         }
 
-        val hasNextPage = response.request.url.queryParameter("offset")
-            ?.toIntOrNull()
-            ?.let { it < 120 } ?: true && animeList.size == 60
+        val hasNextPage = !isApiCall || animeList.size == 60
 
         return AnimesPage(animeList, hasNextPage)
     }
@@ -105,15 +117,14 @@ class StreamingCommunity(override val lang: String, private val showType: String
     // =============================== Latest ===============================
 
     override fun latestUpdatesRequest(page: Int): Request {
-        return if (page == 1) {
-            GET("$baseUrl/browse/latest", headers)
-        } else {
-            val apiHeaders = headers.newBuilder()
-                .add("Accept", "application/json, text/plain, */*")
-                .add("Host", baseUrl.toHttpUrl().host)
-                .add("Referer", "$baseUrl/browse/trending")
-                .build()
-            GET("$baseUrl/api/browse/latest?offset=${(page - 1) * 60}", headers = apiHeaders)
+        return when (page) {
+            in 1..2 -> if (showType == "movie") {
+                GET("$apiUrl/browse/latest?lang=$lang&offset=${(page - 1) * 60}&type=$showType", apiHeaders)
+            } else {
+                GET("$apiUrl/browse/new-episodes?lang=$lang&offset=${(page - 1) * 60}&type=$showType", apiHeaders)
+            }
+            else ->
+                GET("$apiUrl/archive?lang=$lang&offset=${(page - 3) * 60}&sort=created_at&type=$showType", headers = apiHeaders)
         }
     }
 
@@ -138,7 +149,7 @@ class StreamingCommunity(override val lang: String, private val showType: String
                 .add("Host", baseUrl.toHttpUrl().host)
                 .add("Referer", "$baseUrl/$slug")
                 .build()
-            GET("$baseUrl/api/$slug&offset=${(page - 1) * 60}", headers = apiHeaders)
+            GET("$apiUrl/$slug&offset=${(page - 1) * 60}", headers = apiHeaders)
         }
     }
 
@@ -187,11 +198,11 @@ class StreamingCommunity(override val lang: String, private val showType: String
 
     // =========================== Anime Details ============================
 
-    override fun animeDetailsRequest(anime: SAnime): Request = GET("$baseUrl/titles/${anime.url}", headers)
+    override fun animeDetailsRequest(anime: SAnime): Request = GET("$baseUrl/titles/${anime.url}", jsonHeaders)
 
     override fun animeDetailsParse(response: Response): SAnime {
         val parsed = json.decodeFromString<SingleShowResponse>(
-            response.asJsoup().getData(),
+            response.body.string(),
         ).props.title!!
 
         return SAnime.create().apply {
@@ -203,10 +214,10 @@ class StreamingCommunity(override val lang: String, private val showType: String
 
     // ============================== Episodes ==============================
 
-    override fun episodeListRequest(anime: SAnime): Request = GET("$baseUrl/titles/${anime.url}", headers)
+    override fun episodeListRequest(anime: SAnime): Request = GET("$baseUrl/titles/${anime.url}", jsonHeaders)
 
     override fun episodeListParse(response: Response): List<SEpisode> {
-        val parsed = json.decodeFromString<SingleShowResponse>(response.asJsoup().getData())
+        val parsed = json.decodeFromString<SingleShowResponse>(response.body.string())
         val data = parsed.props
         val episodeList = mutableListOf<SEpisode>()
 
