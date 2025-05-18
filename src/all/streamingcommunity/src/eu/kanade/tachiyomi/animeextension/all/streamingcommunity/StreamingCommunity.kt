@@ -12,6 +12,7 @@ import eu.kanade.tachiyomi.animesource.model.SAnime
 import eu.kanade.tachiyomi.animesource.model.SEpisode
 import eu.kanade.tachiyomi.animesource.model.Video
 import eu.kanade.tachiyomi.animesource.online.AnimeHttpSource
+import eu.kanade.tachiyomi.lib.i18n.Intl
 import eu.kanade.tachiyomi.lib.playlistutils.PlaylistUtils
 import eu.kanade.tachiyomi.network.GET
 import eu.kanade.tachiyomi.util.asJsoup
@@ -25,6 +26,7 @@ import uy.kohesive.injekt.Injekt
 import uy.kohesive.injekt.api.get
 import uy.kohesive.injekt.injectLazy
 import java.net.URLEncoder
+import java.util.Locale
 
 class StreamingCommunity(override val lang: String, private val showType: String) : ConfigurableAnimeSource, AnimeHttpSource() {
 
@@ -35,6 +37,15 @@ class StreamingCommunity(override val lang: String, private val showType: String
     private val apiUrl = "$homepage/api"
 
     override val supportsLatest = true
+
+    private val intl = Intl(
+        language = Locale.getDefault().language.takeIf { lang == "all" } ?: lang,
+        baseLanguage = "en",
+        availableLanguages = setOf("en", "it"),
+        classLoader = this::class.java.classLoader!!,
+    )
+    private val seasonIntl = intl["season"]
+    private val episodeIntl = intl["episode"]
 
     override val client: OkHttpClient = network.client
 
@@ -256,7 +267,7 @@ class StreamingCommunity(override val lang: String, private val showType: String
                 episodeData.forEach { episode ->
                     episodeList.add(
                         SEpisode.create().apply {
-                            name = "Stagione ${season.number} episodio ${episode.number} - ${episode.name}"
+                            name = "$seasonIntl ${season.number} $episodeIntl ${episode.number} - ${episode.name}"
                             episode_number = episode.number.toFloat()
                             url = "${data.title.id}?episode_id=${episode.id}&next_episode=1"
                         },
