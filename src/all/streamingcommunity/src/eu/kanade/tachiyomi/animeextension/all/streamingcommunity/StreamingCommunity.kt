@@ -258,7 +258,7 @@ class StreamingCommunity(override val lang: String, private val showType: String
                         .build()
 
                     val body = client.newCall(
-                        GET("${response.request.url}/stagione-${season.number}", headers = inertiaHeaders),
+                        GET("${response.request.url}/season-${season.number}", headers = inertiaHeaders),
                     ).execute().body.string()
 
                     json.decodeFromString<SingleShowResponse>(body).props.loadedSeason!!.episodes
