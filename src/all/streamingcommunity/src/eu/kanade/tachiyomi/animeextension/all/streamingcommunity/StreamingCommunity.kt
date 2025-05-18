@@ -10,7 +10,6 @@ import eu.kanade.tachiyomi.animesource.model.AnimeFilterList
 import eu.kanade.tachiyomi.animesource.model.AnimesPage
 import eu.kanade.tachiyomi.animesource.model.SAnime
 import eu.kanade.tachiyomi.animesource.model.SEpisode
-import eu.kanade.tachiyomi.animesource.model.Track
 import eu.kanade.tachiyomi.animesource.model.Video
 import eu.kanade.tachiyomi.animesource.online.AnimeHttpSource
 import eu.kanade.tachiyomi.lib.playlistutils.PlaylistUtils
@@ -44,6 +43,8 @@ class StreamingCommunity(override val lang: String, private val showType: String
         .build()
 
     private val json: Json by injectLazy()
+
+    private val playlistUtils by lazy { PlaylistUtils(client, headers) }
 
     private val preferences: SharedPreferences by lazy {
         Injekt.get<Application>().getSharedPreferences("source_$id", 0x0000)
@@ -259,7 +260,6 @@ class StreamingCommunity(override val lang: String, private val showType: String
     // ============================ Video Links =============================
 
     override suspend fun getVideoList(episode: SEpisode): List<Video> {
-        val videoSet = mutableSetOf<Video>()
         val doc = client.newCall(
             GET("$baseUrl/iframe/${episode.url}", headers),
         ).execute().asJsoup()
@@ -279,20 +279,18 @@ class StreamingCommunity(override val lang: String, private val showType: String
         val token = TOKEN_REGEX.find(script)!!.groupValues[1]
         val expires = EXPIRES_REGEX.find(script)!!.groupValues[1]
 
-        val masterPlUrl = "$playlistUrl&token=$token&expires=$expires&b=1"
-
-        val masterPl = client.newCall(GET(masterPlUrl)).execute().body.string()
-        val subList = SUBTITLES_REGEX.findAll(masterPl).map {
-            Track(it.groupValues[2], it.groupValues[1])
-        }.toList()
-        QUALITY_REGEX.findAll(masterPl).forEach { match ->
-            val quality = "${match.groupValues[1]}p"
-            val videoUrl = match.groupValues[2]
-            videoSet.add(Video(videoUrl, quality, videoUrl, subtitleTracks = subList))
+        val masterPlUrl = buildString {
+            append(playlistUrl)
+            append(if (playlistUrl.contains('?')) '&' else '?')
+            append("h=1&token=")
+            append(token)
+            append("&expires=")
+            append(expires)
+            append("&lang=")
+            append(lang)
         }
-        require(videoSet.isNotEmpty()) { "Failed to fetch videos" }
 
-        return videoSet.toList().sortedBy { it.quality }
+        return playlistUtils.extractFromHls(playlistUrl = masterPlUrl)
     }
 
     override fun videoListRequest(episode: SEpisode): Request = throw Exception("Not used")
@@ -332,8 +330,6 @@ class StreamingCommunity(override val lang: String, private val showType: String
         private val PLAYLIST_URL_REGEX = Regex("""url: ?'(.*?)'""")
         private val EXPIRES_REGEX = Regex("""'expires': ?'(\d+)'""")
         private val TOKEN_REGEX = Regex("""'token': ?'([\w-]+)'""")
-        private val QUALITY_REGEX = Regex("""RESOLUTION=.*?x(.*).*?\n(.*)""")
-        private val SUBTITLES_REGEX = Regex("""#EXT-X-MEDIA:TYPE=SUBTITLES.*?NAME="(.*?)".*?URI="(.*?)"""")
         private const val PREF_QUALITY_KEY = "preferred_quality"
         private const val PREF_QUALITY_DEFAULT = "1080"
     }
