@@ -26,6 +26,7 @@ import uy.kohesive.injekt.Injekt
 import uy.kohesive.injekt.api.get
 import uy.kohesive.injekt.injectLazy
 import java.net.URLEncoder
+import java.text.SimpleDateFormat
 import java.util.Locale
 
 class StreamingCommunity(override val lang: String, private val showType: String) : ConfigurableAnimeSource, AnimeHttpSource() {
@@ -89,6 +90,7 @@ class StreamingCommunity(override val lang: String, private val showType: String
 
     override fun popularAnimeParse(response: Response): AnimesPage {
         val isApiCall = response.request.url.encodedPath.startsWith("/api/")
+
         val parsed: PropObject = if (isApiCall) {
             json.decodeFromString<PropObject>(response.body.string())
         } else {
@@ -238,6 +240,11 @@ class StreamingCommunity(override val lang: String, private val showType: String
                     name = "Film"
                     episode_number = 1F
                     url = data.title!!.id.toString()
+                    date_upload = with(data.title) {
+                        (release_date ?: last_air_date)?.let(::parseDate)
+                        (created_at ?: updated_at)?.let(::parseDateTime)
+                            ?: 0L
+                    }
                 },
             )
         } else {
@@ -270,6 +277,9 @@ class StreamingCommunity(override val lang: String, private val showType: String
                             name = "$seasonIntl ${season.number} $episodeIntl ${episode.number} - ${episode.name}"
                             episode_number = episode.number.toFloat()
                             url = "${data.title.id}?episode_id=${episode.id}&next_episode=1"
+                            date_upload = season.release_date?.let(::parseDate)
+                                ?: (episode.created_at ?: episode.updated_at)?.let(::parseDateTime)
+                                ?: 0L
                         },
                     )
                 }
@@ -348,12 +358,30 @@ class StreamingCommunity(override val lang: String, private val showType: String
         }
     }
 
+    private fun parseDateTime(dateStr: String): Long {
+        return runCatching { DATE_TIME_FORMATTER.parse(dateStr)?.time }
+            .getOrNull() ?: 0L
+    }
+
+    private fun parseDate(dateStr: String): Long {
+        return runCatching { DATE_FORMATTER.parse(dateStr)?.time }
+            .getOrNull() ?: 0L
+    }
+
     companion object {
         private val PLAYLIST_URL_REGEX = Regex("""url: ?'(.*?)'""")
         private val EXPIRES_REGEX = Regex("""'expires': ?'(\d+)'""")
         private val TOKEN_REGEX = Regex("""'token': ?'([\w-]+)'""")
         private const val PREF_QUALITY_KEY = "preferred_quality"
         private const val PREF_QUALITY_DEFAULT = "1080"
+
+        private val DATE_TIME_FORMATTER by lazy {
+            SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.ENGLISH)
+        }
+
+        private val DATE_FORMATTER by lazy {
+            SimpleDateFormat("yyyy-MM-dd", Locale.ENGLISH)
+        }
     }
 
     // ============================== Settings ==============================
