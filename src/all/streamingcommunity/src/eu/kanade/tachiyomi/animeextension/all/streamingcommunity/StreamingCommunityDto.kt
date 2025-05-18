@@ -1,5 +1,6 @@
-package eu.kanade.tachiyomi.animeextension.it.streamingcommunity
+package eu.kanade.tachiyomi.animeextension.all.streamingcommunity
 
+import eu.kanade.tachiyomi.animeextension.all.streamingcommunity.SingleShowResponse.SingleShowObject.ShowObject.GenreObject
 import kotlinx.serialization.Serializable
 
 @Serializable

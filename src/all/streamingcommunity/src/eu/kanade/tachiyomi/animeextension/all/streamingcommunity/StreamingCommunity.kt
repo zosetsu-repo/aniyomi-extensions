@@ -1,4 +1,4 @@
-package eu.kanade.tachiyomi.animeextension.it.streamingcommunity
+package eu.kanade.tachiyomi.animeextension.all.streamingcommunity
 
 import android.app.Application
 import android.content.SharedPreferences
@@ -13,6 +13,7 @@ import eu.kanade.tachiyomi.animesource.model.SEpisode
 import eu.kanade.tachiyomi.animesource.model.Track
 import eu.kanade.tachiyomi.animesource.model.Video
 import eu.kanade.tachiyomi.animesource.online.AnimeHttpSource
+import eu.kanade.tachiyomi.lib.playlistutils.PlaylistUtils
 import eu.kanade.tachiyomi.network.GET
 import eu.kanade.tachiyomi.util.asJsoup
 import kotlinx.serialization.json.Json
@@ -26,13 +27,11 @@ import uy.kohesive.injekt.api.get
 import uy.kohesive.injekt.injectLazy
 import java.net.URLEncoder
 
-class StreamingCommunity : ConfigurableAnimeSource, AnimeHttpSource() {
+class StreamingCommunity(override val lang: String, private val showType: String) : ConfigurableAnimeSource, AnimeHttpSource() {
 
-    override val name = "StreamingCommunity"
+    override val name = "StreamingUnity (${showType.replaceFirstChar { it.uppercaseChar() }})"
 
-    override val baseUrl = "https://streamingcommunity.spa"
-
-    override val lang = "it"
+    override val baseUrl = "https://streamingunity.to/$lang"
 
     override val supportsLatest = true
 
