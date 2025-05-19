@@ -1,5 +1,6 @@
 package eu.kanade.tachiyomi.animeextension.all.streamingcommunity
 
+import eu.kanade.tachiyomi.animesource.model.SAnime
 import kotlinx.serialization.Serializable
 
 @Serializable
@@ -22,7 +23,29 @@ data class TitleObject(
     val slug: String,
     val name: String,
     val images: List<ImageObject>,
-)
+) {
+    fun toSAnime(imageCdn: String) = SAnime.create().apply {
+        title = name
+        url = "$id-$slug"
+        thumbnail_url = images.firstOrNull {
+            it.type == "poster"
+        }?.let {
+            imageCdn + it.filename
+        } ?: images.firstOrNull {
+            it.type == "cover"
+        }?.let {
+            imageCdn + it.filename
+        } ?: images.firstOrNull {
+            it.type == "cover_mobile"
+        }?.let {
+            imageCdn + it.filename
+        } ?: images.firstOrNull {
+            it.type == "background"
+        }?.let {
+            imageCdn + it.filename
+        }
+    }
+}
 
 @Serializable
 data class ImageObject(
@@ -109,6 +132,12 @@ data class SingleShowResponse(
             data class KeywordObject(
                 val name: String,
             )
+
+            fun toSAnimeUpdate() = SAnime.create().apply {
+                description = plot
+                status = StreamingCommunity.parseStatus(this@ShowObject.status)
+                genre = genres?.joinToString(", ") { it.name }
+            }
         }
 
         @Serializable

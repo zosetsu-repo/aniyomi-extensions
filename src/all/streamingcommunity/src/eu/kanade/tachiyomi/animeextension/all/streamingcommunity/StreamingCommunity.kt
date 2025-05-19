@@ -62,7 +62,7 @@ class StreamingCommunity(override val lang: String, private val showType: String
         .add("X-Requested-With", "XMLHttpRequest")
         .add("Sec-Fetch-Mode", "cors")
         .add("X-Inertia", "true")
-        .add("x-inertia-version", "0e290f93f72ff53cf96ae7d71a94b0fc")
+        .add("x-inertia-version", "344b5a8233900846a870d192f686c3bc")
         .add("Host", baseUrl.toHttpUrl().host)
         .add("Referer", baseUrl)
         .build()
@@ -98,29 +98,7 @@ class StreamingCommunity(override val lang: String, private val showType: String
                 .also { imageCdn = "${it.cdn_url}/images/" }
         }
 
-        val animeList = parsed.titles.map { item ->
-            SAnime.create().apply {
-                title = item.name
-                url = "${item.id}-${item.slug}"
-                thumbnail_url = item.images.firstOrNull {
-                    it.type == "poster"
-                }?.let {
-                    imageCdn + it.filename
-                } ?: item.images.firstOrNull {
-                    it.type == "cover"
-                }?.let {
-                    imageCdn + it.filename
-                } ?: item.images.firstOrNull {
-                    it.type == "cover_mobile"
-                }?.let {
-                    imageCdn + it.filename
-                } ?: item.images.firstOrNull {
-                    it.type == "background"
-                }?.let {
-                    imageCdn + it.filename
-                }
-            }
-        }
+        val animeList = parsed.titles.map { it.toSAnime(imageCdn) }
 
         val hasNextPage = !isApiCall || animeList.size == 60
 
@@ -218,11 +196,15 @@ class StreamingCommunity(override val lang: String, private val showType: String
             response.body.string(),
         ).props.title!!
 
-        return SAnime.create().apply {
-            description = parsed.plot
-            status = parseStatus(parsed.status)
-            genre = parsed.genres?.joinToString(", ") { it.name }
-        }
+        return parsed.toSAnimeUpdate()
+    }
+
+    override fun relatedAnimeListParse(response: Response): List<SAnime> {
+        val parsed = json.decodeFromString<SingleShowResponse>(
+            response.body.string(),
+        ).props.sliders
+
+        return parsed?.flatMap { slider -> slider.titles.map { it.toSAnime(imageCdn) } } ?: emptyList()
     }
 
     // ============================== Episodes ==============================
@@ -348,26 +330,6 @@ class StreamingCommunity(override val lang: String, private val showType: String
         ).reversed()
     }
 
-    private fun parseStatus(statusString: String?): Int {
-        return when (statusString) {
-            "Ended" -> SAnime.COMPLETED
-            "Released" -> SAnime.COMPLETED
-            "Returning Series" -> SAnime.ONGOING
-            "Canceled" -> SAnime.CANCELLED
-            else -> SAnime.UNKNOWN
-        }
-    }
-
-    private fun parseDateTime(dateStr: String): Long {
-        return runCatching { DATE_TIME_FORMATTER.parse(dateStr)?.time }
-            .getOrNull() ?: 0L
-    }
-
-    private fun parseDate(dateStr: String): Long {
-        return runCatching { DATE_FORMATTER.parse(dateStr)?.time }
-            .getOrNull() ?: 0L
-    }
-
     companion object {
         private val PLAYLIST_URL_REGEX = Regex("""url: ?'(.*?)'""")
         private val EXPIRES_REGEX = Regex("""'expires': ?'(\d+)'""")
@@ -381,6 +343,26 @@ class StreamingCommunity(override val lang: String, private val showType: String
 
         private val DATE_FORMATTER by lazy {
             SimpleDateFormat("yyyy-MM-dd", Locale.ENGLISH)
+        }
+
+        internal fun parseStatus(statusString: String?): Int {
+            return when (statusString) {
+                "Ended" -> SAnime.COMPLETED
+                "Released" -> SAnime.COMPLETED
+                "Returning Series" -> SAnime.ONGOING
+                "Canceled" -> SAnime.CANCELLED
+                else -> SAnime.UNKNOWN
+            }
+        }
+
+        private fun parseDateTime(dateStr: String): Long {
+            return runCatching { DATE_TIME_FORMATTER.parse(dateStr)?.time }
+                .getOrNull() ?: 0L
+        }
+
+        private fun parseDate(dateStr: String): Long {
+            return runCatching { DATE_FORMATTER.parse(dateStr)?.time }
+                .getOrNull() ?: 0L
         }
     }
 
