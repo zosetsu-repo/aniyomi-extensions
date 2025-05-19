@@ -24,7 +24,6 @@ import okhttp3.Response
 import uy.kohesive.injekt.Injekt
 import uy.kohesive.injekt.api.get
 import uy.kohesive.injekt.injectLazy
-import java.net.URLEncoder
 import java.text.SimpleDateFormat
 import java.util.Locale
 
@@ -89,8 +88,9 @@ class StreamingCommunity(override val lang: String, private val showType: String
     private val top10TrendingRegex = Regex("""/browse/(top10|trending)""")
 
     override fun popularAnimeParse(response: Response): AnimesPage {
-        val isApiCall = response.request.url.encodedPath.startsWith("/api/")
-        val isTop10Trending = response.request.url.encodedPath.contains(top10TrendingRegex)
+        val path = response.request.url.encodedPath
+        val isApiCall = path.startsWith("/api/")
+        val isTop10Trending = path.contains(top10TrendingRegex)
 
         val parsed: PropObject = if (isApiCall) {
             json.decodeFromString<PropObject>(response.body.string())
@@ -101,7 +101,7 @@ class StreamingCommunity(override val lang: String, private val showType: String
 
         val animeList = parsed.titles.map { it.toSAnime(imageCdn) }
 
-        val hasNextPage = isTop10Trending || !isApiCall || animeList.size == 60
+        val hasNextPage = isTop10Trending || animeList.size == 60
 
         return AnimesPage(animeList, hasNextPage)
     }
@@ -125,65 +125,46 @@ class StreamingCommunity(override val lang: String, private val showType: String
     // =============================== Search ===============================
 
     override fun searchAnimeRequest(page: Int, query: String, filters: AnimeFilterList): Request {
-        val genreFilter = filters.find { it is GenreFilter } as GenreFilter
+        val browseGenreFilter = filters.filterIsInstance<StreamingCommunityFilters.BrowseGenreFilter>().firstOrNull()
 
-        val slug = if (genreFilter.state != 0) {
-            "browse/genre?g=${URLEncoder.encode(genreFilter.toUriPart(), "utf-8")}"
-        } else {
-            "search?q=$query"
-        }
+        val httpUrl = apiUrl.toHttpUrl().newBuilder().apply {
+            if (browseGenreFilter?.isDefault() == false) {
+                if (page <= 2) {
+                    // Limited to only 120 results (2 pages)
+                    addPathSegments("browse/genre")
+                    addQueryParameter(browseGenreFilter.uri, browseGenreFilter.toUriPart())
+                }
+            } else {
+                addPathSegments("archive")
+                addQueryParameter("search", query)
+            }
+            addQueryParameter("lang", lang)
+            addQueryParameter("type", showType)
+            addQueryParameter("offset", ((page - 1) * 60).toString())
+        }.build()
 
-        return if (page == 1) {
-            GET("$baseUrl/$slug")
-        } else {
-            val apiHeaders = headers.newBuilder()
-                .add("Accept", "application/json, text/plain, */*")
-                .add("Host", baseUrl.toHttpUrl().host)
-                .add("Referer", "$baseUrl/$slug")
-                .build()
-            GET("$apiUrl/$slug&offset=${(page - 1) * 60}", headers = apiHeaders)
-        }
+        return GET(httpUrl, apiHeaders)
     }
 
     override fun searchAnimeParse(response: Response): AnimesPage {
         val path = response.request.url.encodedPath
+        val isApiCall = path.startsWith("/api/")
 
-        val parsed = if (path.startsWith("/api/")) {
-            if (path.contains("search")) {
-                json.decodeFromString<SearchAPIResponse>(response.body.string()).data
+        val parsed = if (isApiCall) {
+            if (path.contains("/archive")) {
+                json.decodeFromString<SearchAPIResponse>(response.getData()).data
             } else {
-                json.decodeFromString<GenreAPIResponse>(response.body.string()).titles
+                json.decodeFromString<GenreAPIResponse>(response.getData()).titles
             }
         } else {
-            val data = response.getData()
-            json.decodeFromString<ShowsResponse>(data).props.titles
+            json.decodeFromString<ShowsResponse>(response.getData()).props.titles
         }
 
-        val imageUrl = "https://cdn.${baseUrl.toHttpUrl().host}/images/"
-
-        val animeList = parsed.map { item ->
-            SAnime.create().apply {
-                title = item.name
-                url = "${item.id}-${item.slug}"
-                thumbnail_url = item.images.firstOrNull {
-                    it.type == "poster"
-                }?.let {
-                    imageUrl + it.filename
-                } ?: item.images.firstOrNull {
-                    it.type == "cover"
-                }?.let {
-                    imageUrl + it.filename
-                } ?: item.images.firstOrNull {
-                    it.type == "background"
-                }?.let {
-                    imageUrl + it.filename
-                }
-            }
+        val animeList = parsed.map {
+            it.toSAnime(imageCdn)
         }
 
-        val hasNextPage = response.request.url.queryParameter("offset")
-            ?.toIntOrNull()
-            ?.let { it < 120 } ?: true && animeList.size == 60
+        val hasNextPage = animeList.size == 60
 
         return AnimesPage(animeList, hasNextPage)
     }
@@ -395,45 +376,8 @@ class StreamingCommunity(override val lang: String, private val showType: String
     // ============================== Filters ===============================
 
     override fun getFilterList(): AnimeFilterList = AnimeFilterList(
-        AnimeFilter.Header("Text search ignores filters"),
-        GenreFilter(),
+        AnimeFilter.Header(intl["text_search_ignore"]),
+        StreamingCommunityFilters.BrowseGenreFilter("g", intl),
+        AnimeFilter.Separator(),
     )
-
-    private class GenreFilter : UriPartFilter(
-        "Genres",
-        arrayOf(
-            Pair("<select>", ""),
-            Pair("Action & Adventure", "Action & Adventure"),
-            Pair("Animazione", "Animazione"),
-            Pair("Avventura", "Avventura"),
-            Pair("Azione", "Azione"),
-            Pair("Commedia", "Commedia"),
-            Pair("Crime", "Crime"),
-            Pair("Documentario", "Documentario"),
-            Pair("Dramma", "Dramma"),
-            Pair("Famiglia", "Famiglia"),
-            Pair("Fantascienza", "Fantascienza"),
-            Pair("Fantasy", "Fantasy"),
-            Pair("Guerra", "Guerra"),
-            Pair("Horror", "Horror"),
-            Pair("Kids", "Kids"),
-            Pair("Korean drama", "Korean drama"),
-            Pair("Mistero", "Mistero"),
-            Pair("Musica", "Musica"),
-            Pair("Reality", "Reality"),
-            Pair("Romance", "Romance"),
-            Pair("Sci-Fi & Fantasy", "Sci-Fi & Fantasy"),
-            Pair("Soap", "Soap"),
-            Pair("Storia", "Storia"),
-            Pair("televisione film", "televisione film"),
-            Pair("Thriller", "Thriller"),
-            Pair("War & Politics", "War & Politics"),
-            Pair("Western", "Western"),
-        ),
-    )
-
-    private open class UriPartFilter(displayName: String, val vals: Array<Pair<String, String>>) :
-        AnimeFilter.Select<String>(displayName, vals.map { it.first }.toTypedArray()) {
-        fun toUriPart() = vals[state].second
-    }
 }
