@@ -21,7 +21,6 @@ import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.Response
-import org.jsoup.nodes.Document
 import uy.kohesive.injekt.Injekt
 import uy.kohesive.injekt.api.get
 import uy.kohesive.injekt.injectLazy
@@ -58,13 +57,12 @@ class StreamingCommunity(override val lang: String, private val showType: String
         .build()
 
     private val jsonHeaders = headers.newBuilder()
-        .add("Accept", "text/html, application/xhtml+xml")
-        .add("X-Requested-With", "XMLHttpRequest")
-        .add("Sec-Fetch-Mode", "cors")
-        .add("X-Inertia", "true")
-        .add("x-inertia-version", "344b5a8233900846a870d192f686c3bc")
         .add("Host", baseUrl.toHttpUrl().host)
         .add("Referer", baseUrl)
+        .add("Content-Type", "application/json")
+        .add("X-Requested-With", "XMLHttpRequest")
+        .add("X-Inertia", "true")
+        .add("x-inertia-version", "344b5a8233900846a870d192f686c3bc") // This requires up-to-date `version`
         .build()
 
     private val json: Json by injectLazy()
@@ -79,8 +77,8 @@ class StreamingCommunity(override val lang: String, private val showType: String
 
     override fun popularAnimeRequest(page: Int): Request {
         return when (page) {
-            1 -> GET("$baseUrl/browse/top10?lang=$lang&type=$showType", jsonHeaders)
-            2 -> GET("$baseUrl/browse/trending?lang=$lang&type=$showType", jsonHeaders)
+            1 -> GET("$apiUrl/browse/top10?lang=$lang&type=$showType", apiHeaders)
+            2 -> GET("$apiUrl/browse/trending?lang=$lang&type=$showType", apiHeaders)
             else ->
                 GET("$apiUrl/archive?lang=$lang&offset=${(page - 3) * 60}&sort=views&type=$showType", headers = apiHeaders)
         }
@@ -88,8 +86,11 @@ class StreamingCommunity(override val lang: String, private val showType: String
 
     private var imageCdn = "https://cdn.${baseUrl.toHttpUrl().host}/images/"
 
+    private val top10TrendingRegex = Regex("""/browse/(top10|trending)""")
+
     override fun popularAnimeParse(response: Response): AnimesPage {
         val isApiCall = response.request.url.encodedPath.startsWith("/api/")
+        val isTop10Trending = response.request.url.encodedPath.contains(top10TrendingRegex)
 
         val parsed: PropObject = if (isApiCall) {
             json.decodeFromString<PropObject>(response.body.string())
@@ -100,7 +101,7 @@ class StreamingCommunity(override val lang: String, private val showType: String
 
         val animeList = parsed.titles.map { it.toSAnime(imageCdn) }
 
-        val hasNextPage = !isApiCall || animeList.size == 60
+        val hasNextPage = isTop10Trending || !isApiCall || animeList.size == 60
 
         return AnimesPage(animeList, hasNextPage)
     }
@@ -154,7 +155,7 @@ class StreamingCommunity(override val lang: String, private val showType: String
                 json.decodeFromString<GenreAPIResponse>(response.body.string()).titles
             }
         } else {
-            val data = response.asJsoup().getData()
+            val data = response.getData()
             json.decodeFromString<ShowsResponse>(data).props.titles
         }
 
@@ -189,30 +190,32 @@ class StreamingCommunity(override val lang: String, private val showType: String
 
     // =========================== Anime Details ============================
 
-    override fun animeDetailsRequest(anime: SAnime): Request = GET("$baseUrl/titles/${anime.url}", jsonHeaders)
+    override fun animeDetailsRequest(anime: SAnime): Request = GET("$baseUrl/titles/${anime.url}", headers)
 
     override fun animeDetailsParse(response: Response): SAnime {
-        val parsed = json.decodeFromString<SingleShowResponse>(
-            response.body.string(),
+        val title = json.decodeFromString<SingleShowResponse>(
+            response.getData(),
         ).props.title!!
 
-        return parsed.toSAnimeUpdate()
+        return title.toSAnimeUpdate()
     }
 
     override fun relatedAnimeListParse(response: Response): List<SAnime> {
-        val parsed = json.decodeFromString<SingleShowResponse>(
-            response.body.string(),
+        val sliders = json.decodeFromString<SingleShowResponse>(
+            response.getData(),
         ).props.sliders
 
-        return parsed?.flatMap { slider -> slider.titles.map { it.toSAnime(imageCdn) } } ?: emptyList()
+        return sliders?.flatMap { slider -> slider.titles.map { it.toSAnime(imageCdn) } } ?: emptyList()
     }
 
     // ============================== Episodes ==============================
 
-    override fun episodeListRequest(anime: SAnime): Request = GET("$baseUrl/titles/${anime.url}", jsonHeaders)
+    override fun episodeListRequest(anime: SAnime): Request = animeDetailsRequest(anime)
 
     override fun episodeListParse(response: Response): List<SEpisode> {
-        val parsed = json.decodeFromString<SingleShowResponse>(response.body.string())
+        val parsed = json.decodeFromString<SingleShowResponse>(
+            response.getData(),
+        )
         val data = parsed.props
         val episodeList = mutableListOf<SEpisode>()
 
@@ -230,22 +233,21 @@ class StreamingCommunity(override val lang: String, private val showType: String
                 },
             )
         } else {
+            val inertiaHeaders = headers.newBuilder()
+                .add("Host", baseUrl.toHttpUrl().host)
+                .add("Referer", "${response.request.url}/")
+                .add("Content-Type", "application/json")
+                .add("X-Requested-With", "XMLHttpRequest")
+                .add("X-Inertia", "true")
+                .add("X-Inertia-Version", parsed.version!!)
+                .add("X-Inertia-Partial-Component", "Titles/Title")
+                .add("X-Inertia-Partial-Data", "loadedSeason,flash")
+                .build()
+
             data.title!!.seasons.forEach { season ->
                 val episodeData = if (season.id == data.loadedSeason.id) {
                     data.loadedSeason.episodes
                 } else {
-                    val inertiaHeaders = headers.newBuilder()
-                        .add("Accept", "text/html, application/xhtml+xml")
-                        .add("Content-Type", "application/json")
-                        .add("Host", baseUrl.toHttpUrl().host)
-                        .add("Referer", "${response.request.url}/")
-                        .add("X-Inertia", "true")
-                        .add("X-Inertia-Partial-Component", "Titles/Title")
-                        .add("X-Inertia-Partial-Data", "loadedSeason,flash")
-                        .add("X-Inertia-Version", parsed.version!!)
-                        .add("X-Requested-With", "XMLHttpRequest")
-                        .build()
-
                     val body = client.newCall(
                         GET("${response.request.url}/season-${season.number}", headers = inertiaHeaders),
                     ).execute().body.string()
@@ -313,16 +315,20 @@ class StreamingCommunity(override val lang: String, private val showType: String
 
     // ============================= Utilities ==============================
 
-    private fun Document.getData(): String {
-        return this.selectFirst("div#app[data-page]")!!
-            .attr("data-page")
-            .replace("&quot;", "\"")
+    private fun Response.getData(): String {
+        return if (headers["content-type"] == "application/json") {
+            body.string()
+        } else {
+            asJsoup().selectFirst("div#app[data-page]")!!
+                .attr("data-page")
+                .replace("&quot;", "\"")
+        }
     }
 
     override fun List<Video>.sort(): List<Video> {
         val quality = preferences.getString(PREF_QUALITY_KEY, PREF_QUALITY_DEFAULT)!!
 
-        return this.sortedWith(
+        return sortedWith(
             compareBy(
                 { it.quality.contains(quality) },
                 { Regex("""(\d+)p""").find(it.quality)?.groupValues?.get(1)?.toIntOrNull() ?: 0 },
