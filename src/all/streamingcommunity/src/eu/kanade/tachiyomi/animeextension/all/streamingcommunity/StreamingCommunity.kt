@@ -58,8 +58,6 @@ class StreamingCommunity(override val lang: String, private val showType: String
     override val client: OkHttpClient = network.client
 
     private val apiHeaders = headers.newBuilder()
-        .add("Accept", "application/json, text/plain, */*")
-        .add("Sec-Fetch-Mode", "cors")
         .add("Host", baseUrl.toHttpUrl().host)
         .add("Referer", baseUrl)
         .build()
@@ -88,7 +86,7 @@ class StreamingCommunity(override val lang: String, private val showType: String
             1 -> GET("$apiUrl/browse/top10?lang=$lang&type=$showType", apiHeaders)
             2 -> GET("$apiUrl/browse/trending?lang=$lang&type=$showType", apiHeaders)
             else ->
-                GET("$apiUrl/archive?lang=$lang&offset=${(page - 3) * 60}&sort=views&type=$showType", headers = apiHeaders)
+                GET("$apiUrl/archive?lang=$lang&offset=${(page - 3) * 60}&sort=views&type=$showType", apiHeaders)
         }
     }
 
@@ -125,7 +123,7 @@ class StreamingCommunity(override val lang: String, private val showType: String
                 GET("$apiUrl/browse/new-episodes?lang=$lang&offset=${(page - 1) * 60}&type=$showType", apiHeaders)
             }
             else ->
-                GET("$apiUrl/archive?lang=$lang&offset=${(page - 3) * 60}&sort=created_at&type=$showType", headers = apiHeaders)
+                GET("$apiUrl/archive?lang=$lang&offset=${(page - 3) * 60}&sort=created_at&type=$showType", apiHeaders)
         }
     }
 
@@ -283,7 +281,7 @@ class StreamingCommunity(override val lang: String, private val showType: String
                     data.loadedSeason.episodes
                 } else {
                     val body = client.newCall(
-                        GET("${response.request.url}/season-${season.number}", headers = inertiaHeaders),
+                        GET("${response.request.url}/season-${season.number}", inertiaHeaders),
                     ).execute().body.string()
 
                     json.decodeFromString<SingleShowResponse>(body).props.loadedSeason!!.episodes
@@ -323,7 +321,7 @@ class StreamingCommunity(override val lang: String, private val showType: String
             .add("Referer", "$baseUrl/")
             .build()
 
-        val iframe = client.newCall(GET(iframeUrl, headers = iframeHeaders)).execute().asJsoup()
+        val iframe = client.newCall(GET(iframeUrl, iframeHeaders)).execute().asJsoup()
         val script = iframe.selectFirst("script:containsData(masterPlaylist)")!!.data().replace("\n", "\t")
         val playlistUrl = PLAYLIST_URL_REGEX.find(script)!!.groupValues[1]
         val token = TOKEN_REGEX.find(script)!!.groupValues[1]
