@@ -4,6 +4,14 @@ import android.app.Application
 import android.content.SharedPreferences
 import androidx.preference.ListPreference
 import androidx.preference.PreferenceScreen
+import eu.kanade.tachiyomi.animeextension.all.streamingcommunity.Filters.AgeFilter
+import eu.kanade.tachiyomi.animeextension.all.streamingcommunity.Filters.FeaturedFilter
+import eu.kanade.tachiyomi.animeextension.all.streamingcommunity.Filters.GenresFilter
+import eu.kanade.tachiyomi.animeextension.all.streamingcommunity.Filters.QualityFilter
+import eu.kanade.tachiyomi.animeextension.all.streamingcommunity.Filters.ScoreFilter
+import eu.kanade.tachiyomi.animeextension.all.streamingcommunity.Filters.ServiceFilter
+import eu.kanade.tachiyomi.animeextension.all.streamingcommunity.Filters.SortFilter
+import eu.kanade.tachiyomi.animeextension.all.streamingcommunity.Filters.YearFilter
 import eu.kanade.tachiyomi.animesource.ConfigurableAnimeSource
 import eu.kanade.tachiyomi.animesource.model.AnimeFilter
 import eu.kanade.tachiyomi.animesource.model.AnimeFilterList
@@ -15,6 +23,7 @@ import eu.kanade.tachiyomi.animesource.online.AnimeHttpSource
 import eu.kanade.tachiyomi.lib.i18n.Intl
 import eu.kanade.tachiyomi.lib.playlistutils.PlaylistUtils
 import eu.kanade.tachiyomi.network.GET
+import eu.kanade.tachiyomi.network.awaitSuccess
 import eu.kanade.tachiyomi.util.asJsoup
 import kotlinx.serialization.json.Json
 import okhttp3.HttpUrl.Companion.toHttpUrl
@@ -124,26 +133,74 @@ class StreamingCommunity(override val lang: String, private val showType: String
 
     // =============================== Search ===============================
 
-    override fun searchAnimeRequest(page: Int, query: String, filters: AnimeFilterList): Request {
-        val browseGenreFilter = filters.filterIsInstance<StreamingCommunityFilters.BrowseGenreFilter>().firstOrNull()
-
-        val httpUrl = apiUrl.toHttpUrl().newBuilder().apply {
-            if (browseGenreFilter?.isDefault() == false) {
-                if (page <= 2) {
+    override suspend fun getSearchAnime(page: Int, query: String, filters: AnimeFilterList): AnimesPage {
+        val featuredFilter = filters.filterIsInstance<FeaturedFilter>().firstOrNull()
+        if (query.isBlank() && featuredFilter?.isDefault() == false) {
+            val httpUrl = apiUrl.toHttpUrl().newBuilder().apply {
+                addPathSegments("browse/genre")
+                addQueryParameter(featuredFilter.uri, featuredFilter.toUriPart())
+            }.build()
+            return client.newCall(GET(httpUrl, apiHeaders))
+                .awaitSuccess()
+                .use(::searchAnimeParse)
+                .let {
                     // Limited to only 120 results (2 pages)
-                    addPathSegments("browse/genre")
-                    addQueryParameter(browseGenreFilter.uri, browseGenreFilter.toUriPart())
+                    if (page == 2) {
+                        it.copy(hasNextPage = false)
+                    } else {
+                        it
+                    }
                 }
-            } else {
-                addPathSegments("archive")
-                addQueryParameter("search", query)
+        } else {
+            val request = searchAnimeRequest(page, query, filters)
+            return client.newCall(request)
+                .awaitSuccess()
+                .use(::searchAnimeParse)
+        }
+    }
+
+    override fun searchAnimeRequest(page: Int, query: String, filters: AnimeFilterList): Request {
+        val genresFilter = filters.filterIsInstance<GenresFilter>().firstOrNull()
+        val sortFilter = filters.filterIsInstance<SortFilter>().firstOrNull()
+        val yearFilter = filters.filterIsInstance<YearFilter>().firstOrNull()
+        val scoreFilter = filters.filterIsInstance<ScoreFilter>().firstOrNull()
+        val serviceFilter = filters.filterIsInstance<ServiceFilter>().firstOrNull()
+        val qualityFilter = filters.filterIsInstance<QualityFilter>().firstOrNull()
+        val ageFilter = filters.filterIsInstance<AgeFilter>().firstOrNull()
+
+        val httpUrlBuilder = apiUrl.toHttpUrl().newBuilder()
+        httpUrlBuilder.apply {
+            addPathSegments("archive")
+            addQueryParameter("search", query)
+            if (sortFilter?.isDefault() == false) {
+                addQueryParameter(sortFilter.uri, sortFilter.toUriPart())
             }
+            if (yearFilter?.isDefault() == false) {
+                addQueryParameter(yearFilter.uri, yearFilter.toUriPart())
+            }
+            if (scoreFilter?.isDefault() == false) {
+                addQueryParameter(scoreFilter.uri, scoreFilter.toUriPart())
+            }
+            if (serviceFilter?.isDefault() == false) {
+                addQueryParameter(serviceFilter.uri, serviceFilter.toUriPart())
+            }
+            if (qualityFilter?.isDefault() == false) {
+                addQueryParameter(qualityFilter.uri, qualityFilter.toUriPart())
+            }
+            if (ageFilter?.isDefault() == false) {
+                addQueryParameter(ageFilter.uri, ageFilter.toUriPart())
+            }
+        }
+
+        genresFilter?.addToUri(httpUrlBuilder)
+
+        httpUrlBuilder.apply {
             addQueryParameter("lang", lang)
             addQueryParameter("type", showType)
             addQueryParameter("offset", ((page - 1) * 60).toString())
-        }.build()
+        }
 
-        return GET(httpUrl, apiHeaders)
+        return GET(httpUrlBuilder.build(), apiHeaders)
     }
 
     override fun searchAnimeParse(response: Response): AnimesPage {
@@ -151,11 +208,7 @@ class StreamingCommunity(override val lang: String, private val showType: String
         val isApiCall = path.startsWith("/api/")
 
         val parsed = if (isApiCall) {
-            if (path.contains("/archive")) {
-                json.decodeFromString<SearchAPIResponse>(response.getData()).data
-            } else {
-                json.decodeFromString<GenreAPIResponse>(response.getData()).titles
-            }
+            json.decodeFromString<PropObject>(response.getData()).titles
         } else {
             json.decodeFromString<ShowsResponse>(response.getData()).props.titles
         }
@@ -376,8 +429,14 @@ class StreamingCommunity(override val lang: String, private val showType: String
     // ============================== Filters ===============================
 
     override fun getFilterList(): AnimeFilterList = AnimeFilterList(
-        AnimeFilter.Header(intl["text_search_ignore"]),
-        StreamingCommunityFilters.BrowseGenreFilter("g", intl),
+        GenresFilter(intl),
+        SortFilter(intl),
+        ScoreFilter(intl),
+        YearFilter(intl),
+        ServiceFilter(intl),
+        QualityFilter(intl),
+        AgeFilter(intl),
         AnimeFilter.Separator(),
+        FeaturedFilter(intl),
     )
 }

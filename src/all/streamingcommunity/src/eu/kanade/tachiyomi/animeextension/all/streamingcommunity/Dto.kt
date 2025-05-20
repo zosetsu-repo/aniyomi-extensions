@@ -170,13 +170,3 @@ data class SingleShowResponse(
         }
     }
 }
-
-@Serializable
-data class SearchAPIResponse(
-    val data: List<TitleObject>,
-)
-
-@Serializable
-data class GenreAPIResponse(
-    val titles: List<TitleObject>,
-)
