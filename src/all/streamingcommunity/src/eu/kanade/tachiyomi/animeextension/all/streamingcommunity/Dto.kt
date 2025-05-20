@@ -1,7 +1,10 @@
 package eu.kanade.tachiyomi.animeextension.all.streamingcommunity
 
 import eu.kanade.tachiyomi.animesource.model.SAnime
+import eu.kanade.tachiyomi.lib.i18n.Intl
 import kotlinx.serialization.Serializable
+import java.math.BigDecimal
+import java.math.RoundingMode
 
 @Serializable
 data class ShowsResponse(
@@ -71,11 +74,12 @@ data class SingleShowResponse(
             val id: Int,
             val name: String,
             val original_name: String,
+            val type: String,
             val plot: String? = null,
             val quality: String, // HD
             val status: String? = null,
             val runtime: Int?,
-            val score: String, // 7.7
+            val score: String?, // 7.7
             val tmdb_id: Int?,
             val imdb_id: String?, // tt20969586
             val release_date: String?, // "2018-01-07",
@@ -133,10 +137,41 @@ data class SingleShowResponse(
                 val name: String,
             )
 
-            fun toSAnimeUpdate() = SAnime.create().apply {
-                description = plot
-                status = StreamingCommunity.parseStatus(this@ShowObject.status)
+            fun toSAnimeUpdate(intl: Intl) = SAnime.create().apply {
+                val parsedStatus = StreamingCommunity.parseStatus(this@ShowObject.status)
+
+                val desc = StringBuilder().apply {
+                    append(fancyScore)
+                    append(plot)
+                    append("\n")
+                    append("\n" + intl["original_name"] + ": $original_name")
+                    append("\n" + intl["quality"] + ": $quality")
+                    runtime?.let { append(" - " + intl["run_time"] + ": ${it}m") }
+                    release_date?.let { append("\n" + intl["release_date"] + ": $it") }
+                    if (parsedStatus == SAnime.UNKNOWN) { append("\n" + intl["status"] + ": ${this@ShowObject.status}") }
+                    age?.let { append("\n" + intl["rating"] + ": $it+") }
+                    main_actors.joinToString { it.name }
+                        .let { if (it.isNotBlank()) append("\n\n" + intl["cast"] + ": $it+\n") }
+                    imdb_id?.let { append("\n[IMDB](https://www.imdb.com/title/$it)") }
+                    tmdb_id?.let { append("\n[TMDB](https://www.themoviedb.org/$type/$it)") }
+                }.toString()
+
+                description = desc
+                status = parsedStatus
                 genre = genres?.joinToString(", ") { it.name }
+                author = main_directors.joinToString { it.name }
+            }
+
+            private val fancyScore: String = if (score.isNullOrEmpty()) {
+                ""
+            } else {
+                val stars = score.toBigDecimal().div(BigDecimal(2))
+                    .setScale(0, RoundingMode.HALF_UP).toInt()
+                buildString {
+                    append("★".repeat(stars))
+                    if (stars < 5) append("☆".repeat(5 - stars))
+                    append(" $score\n")
+                }
             }
         }
 

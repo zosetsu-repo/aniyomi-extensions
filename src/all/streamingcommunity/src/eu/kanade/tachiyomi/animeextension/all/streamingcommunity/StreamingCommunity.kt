@@ -231,7 +231,7 @@ class StreamingCommunity(override val lang: String, private val showType: String
             response.getData(),
         ).props.title!!
 
-        return title.toSAnimeUpdate()
+        return title.toSAnimeUpdate(intl)
     }
 
     override fun relatedAnimeListParse(response: Response): List<SAnime> {
