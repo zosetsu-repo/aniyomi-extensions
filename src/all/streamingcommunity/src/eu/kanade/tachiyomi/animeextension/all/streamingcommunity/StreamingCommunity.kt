@@ -251,12 +251,24 @@ class StreamingCommunity(override val lang: String, private val showType: String
         val data = parsed.props
         val episodeList = mutableListOf<SEpisode>()
 
+        if (data.title == null) return emptyList()
+
+        data.title.preview?.let {
+            episodeList.add(
+                SEpisode.create().apply {
+                    name = "Preview"
+                    episode_number = 0F
+                    url = it.embed_url
+                },
+            )
+        }
+
         if (data.loadedSeason == null) {
             episodeList.add(
                 SEpisode.create().apply {
                     name = "Film"
                     episode_number = 1F
-                    url = data.title!!.id.toString()
+                    url = data.title.id.toString()
                     date_upload = with(data.title) {
                         (release_date ?: last_air_date)?.let(::parseDate)
                         (created_at ?: updated_at)?.let(::parseDateTime)
@@ -276,7 +288,7 @@ class StreamingCommunity(override val lang: String, private val showType: String
                 .add("X-Inertia-Partial-Data", "loadedSeason,flash")
                 .build()
 
-            data.title!!.seasons.forEach { season ->
+            data.title.seasons.forEach { season ->
                 val episodeData = if (season.id == data.loadedSeason.id) {
                     data.loadedSeason.episodes
                 } else {
@@ -308,12 +320,17 @@ class StreamingCommunity(override val lang: String, private val showType: String
     // ============================ Video Links =============================
 
     override suspend fun getVideoList(episode: SEpisode): List<Video> {
-        val doc = client.newCall(
-            GET("$baseUrl/iframe/${episode.url}", headers),
-        ).execute().asJsoup()
-
-        val iframeUrl = doc.selectFirst("iframe[src]")?.attr("abs:src")
-            ?: error("Failed to extract iframe")
+        val iframeUrl = if (episode.url.startsWith("https://")) {
+            episode.url
+        } else {
+            client.newCall(
+                GET("$baseUrl/iframe/${episode.url}", headers),
+            ).awaitSuccess().use {
+                it.asJsoup()
+                    .selectFirst("iframe[src]")?.attr("abs:src")
+                    ?: error("Failed to extract iframe")
+            }
+        }
 
         val iframeHeaders = headers.newBuilder()
             .add("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8")
