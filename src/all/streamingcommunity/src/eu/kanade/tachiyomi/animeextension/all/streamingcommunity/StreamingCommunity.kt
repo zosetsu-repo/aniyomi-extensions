@@ -271,7 +271,7 @@ class StreamingCommunity(override val lang: String, private val showType: String
                     url = data.title.id.toString()
                     date_upload = with(data.title) {
                         (release_date ?: last_air_date)?.let(::parseDate)
-                        (created_at ?: updated_at)?.let(::parseDateTime)
+                            ?: (created_at ?: updated_at)?.let(::parseDateTime)
                             ?: 0L
                     }
                 },

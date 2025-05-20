@@ -162,17 +162,16 @@ data class SingleShowResponse(
                 author = main_directors.joinToString { it.name }
             }
 
-            private val fancyScore: String = if (score.isNullOrEmpty()) {
-                ""
-            } else {
-                val stars = score.toBigDecimal().div(BigDecimal(2))
-                    .setScale(0, RoundingMode.HALF_UP).toInt()
-                buildString {
-                    append("★".repeat(stars))
-                    if (stars < 5) append("☆".repeat(5 - stars))
-                    append(" $score\n")
-                }
-            }
+            private val fancyScore: String =
+                score?.toBigDecimalOrNull()?.div(BigDecimal(2))
+                    ?.setScale(0, RoundingMode.HALF_UP)?.toInt()
+                    ?.let {
+                        buildString {
+                            append("★".repeat(it))
+                            if (it < 5) append("☆".repeat(5 - it))
+                            append(" $score\n")
+                        }
+                    } ?: ""
         }
 
         @Serializable
