@@ -142,16 +142,15 @@ data class SingleShowResponse(
 
                 val desc = StringBuilder().apply {
                     append(fancyScore)
-                    append(plot)
-                    append("\n")
-                    append("\n" + intl["original_name"] + ": $original_name")
-                    append("\n" + intl["quality"] + ": $quality")
-                    runtime?.let { append(" - " + intl["run_time"] + ": ${it}m") }
-                    release_date?.let { append("\n" + intl["release_date"] + ": $it") }
-                    if (parsedStatus == SAnime.UNKNOWN) { append("\n" + intl["status"] + ": ${this@ShowObject.status}") }
-                    age?.let { append("\n" + intl["rating"] + ": $it+") }
+                    plot?.let { append("$it\n\n") }
+                    append(intl["original_name"]).append(": $original_name")
+                    append("\n").append(intl["quality"]).append(": $quality")
+                    runtime?.let { append(" - ").append(intl["run_time"]).append(": ${it}m") }
+                    release_date?.let { append("\n").append(intl["release_date"]).append(": $it") }
+                    if (parsedStatus == SAnime.UNKNOWN) { append("\n").append(intl["status"]).append(": ${this@ShowObject.status}") }
+                    age?.let { append("\n").append(intl["rating"]).append(": $it+") }
                     main_actors.joinToString { it.name }
-                        .let { if (it.isNotBlank()) append("\n\n" + intl["cast"] + ": $it+\n") }
+                        .let { if (it.isNotBlank()) append("\n\n").append(intl["cast"]).append(": $it+\n") }
                     imdb_id?.let { append("\n[IMDB](https://www.imdb.com/title/$it)") }
                     tmdb_id?.let { append("\n[TMDB](https://www.themoviedb.org/$type/$it)") }
                 }.toString()
