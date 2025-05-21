@@ -94,12 +94,10 @@ class StreamingCommunity(override val lang: String, private val showType: String
 
     private var imageCdn = "https://cdn.${baseUrl.toHttpUrl().host}/images/"
 
-    private val top10TrendingRegex = Regex("""/browse/(top10|trending)""")
-
     override fun popularAnimeParse(response: Response): AnimesPage {
         val path = response.request.url.encodedPath
         val isApiCall = path.startsWith("/api/")
-        val isTop10Trending = path.contains(top10TrendingRegex)
+        val isTop10Trending = path.contains(TOP10_TRENDING_REGEX)
 
         val parsed: PropObject = if (isApiCall) {
             json.decodeFromString<PropObject>(response.body.string())
@@ -409,16 +407,18 @@ class StreamingCommunity(override val lang: String, private val showType: String
 
         return sortedWith(
             compareBy(
-                { it.quality.contains(quality) },
-                { Regex("""(\d+)p""").find(it.quality)?.groupValues?.get(1)?.toIntOrNull() ?: 0 },
+                { it.quality.contains("${quality}p") },
+                { QUALITY_REGEX.find(it.quality)?.groupValues?.get(1)?.toIntOrNull() ?: 0 },
             ),
         ).reversed()
     }
 
     companion object {
+        private val TOP10_TRENDING_REGEX = Regex("""/browse/(top10|trending)""")
         private val PLAYLIST_URL_REGEX = Regex("""url: ?'(.*?)'""")
         private val EXPIRES_REGEX = Regex("""'expires': ?'(\d+)'""")
         private val TOKEN_REGEX = Regex("""'token': ?'([\w-]+)'""")
+        private val QUALITY_REGEX = Regex("""(\d+)p""")
         private const val PREF_QUALITY_KEY = "preferred_quality"
         private const val PREF_QUALITY_DEFAULT = "1080"
 
