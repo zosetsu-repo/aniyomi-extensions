@@ -103,7 +103,7 @@ class StreamingCommunity(override val lang: String, private val showType: String
             json.decodeFromString<PropObject>(response.body.string())
         } else {
             json.decodeFromString<ShowsResponse>(response.body.string()).props
-                .also { imageCdn = "${it.cdn_url}/images/" }
+                .also { props -> props.cdn_url?.takeIf { it.isNotBlank() }?.let { imageCdn = "$it/images/" } }
         }
 
         val animeList = parsed.titles.map { it.toSAnime(imageCdn) }
@@ -209,7 +209,7 @@ class StreamingCommunity(override val lang: String, private val showType: String
             json.decodeFromString<PropObject>(response.getData()).titles
         } else {
             json.decodeFromString<ShowsResponse>(response.getData()).props
-                .also { imageCdn = "${it.cdn_url}/images/" }
+                .also { props -> props.cdn_url?.takeIf { it.isNotBlank() }?.let { imageCdn = "$it/images/" } }
                 .titles
         }
 
