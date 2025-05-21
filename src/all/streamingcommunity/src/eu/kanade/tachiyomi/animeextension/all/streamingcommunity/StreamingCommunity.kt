@@ -386,7 +386,7 @@ class StreamingCommunity(override val lang: String, private val showType: String
     // ============================= Utilities ==============================
 
     private fun Response.getData(): String {
-        return if (headers["content-type"] == "application/json") {
+        return if (headers["content-type"]?.contains("application/json") == true) {
             body.string()
         } else {
             asJsoup().selectFirst("div#app[data-page]")!!
