@@ -149,7 +149,7 @@ data class SingleShowResponse(
                     if (parsedStatus == SAnime.UNKNOWN) { append("\n").append(intl["status"]).append(": ${this@ShowObject.status}") }
                     age?.let { append("\n").append(intl["rating"]).append(": $it+") }
                     main_actors.joinToString { it.name }
-                        .let { if (it.isNotBlank()) append("\n\n").append(intl["cast"]).append(": $it+\n") }
+                        .let { if (it.isNotBlank()) append("\n\n").append(intl["cast"]).append(": $it\n") }
                     imdb_id?.let { append("\n[IMDB](https://www.imdb.com/title/$it)") }
                     tmdb_id?.let { append("\n[TMDB](https://www.themoviedb.org/$type/$it)") }
                 }.toString()
