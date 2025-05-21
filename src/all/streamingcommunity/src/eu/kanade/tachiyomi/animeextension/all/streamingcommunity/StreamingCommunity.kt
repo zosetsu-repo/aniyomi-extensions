@@ -360,10 +360,10 @@ class StreamingCommunity(override val lang: String, private val showType: String
             .build()
 
         val iframe = client.newCall(GET(iframeUrl, iframeHeaders)).execute().asJsoup()
-        val script = iframe.selectFirst("script:containsData(masterPlaylist)")!!.data().replace("\n", "\t")
-        val playlistUrl = PLAYLIST_URL_REGEX.find(script)!!.groupValues[1]
-        val token = TOKEN_REGEX.find(script)!!.groupValues[1]
-        val expires = EXPIRES_REGEX.find(script)!!.groupValues[1]
+        val script = iframe.selectFirst("script:containsData(masterPlaylist)")?.data()?.replace("\n", "\t") ?: return emptyList()
+        val playlistUrl = PLAYLIST_URL_REGEX.find(script)?.groupValues?.get(1) ?: return emptyList()
+        val token = TOKEN_REGEX.find(script)?.groupValues?.get(1) ?: return emptyList()
+        val expires = EXPIRES_REGEX.find(script)?.groupValues?.get(1) ?: return emptyList()
 
         val masterPlUrl = buildString {
             append(playlistUrl)
