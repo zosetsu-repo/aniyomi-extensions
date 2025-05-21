@@ -47,13 +47,11 @@ class StreamingCommunity(override val lang: String, private val showType: String
     override val supportsLatest = true
 
     private val intl = Intl(
-        language = Locale.getDefault().language.takeIf { lang == "all" } ?: lang,
+        language = Locale(lang).language,
         baseLanguage = "en",
         availableLanguages = setOf("en", "it"),
         classLoader = this::class.java.classLoader!!,
     )
-    private val seasonIntl = intl["season"]
-    private val episodeIntl = intl["episode"]
 
     override val client: OkHttpClient = network.client
 
@@ -287,6 +285,9 @@ class StreamingCommunity(override val lang: String, private val showType: String
                 .add("X-Inertia-Partial-Component", "Titles/Title")
                 .add("X-Inertia-Partial-Data", "loadedSeason,flash")
                 .build()
+
+            val seasonIntl = intl["season"]
+            val episodeIntl = intl["episode"]
 
             data.title.seasons.forEach { season ->
                 val episodeData = if (season.id == data.loadedSeason.id) {
