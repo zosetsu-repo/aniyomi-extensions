@@ -231,7 +231,8 @@ class StreamingCommunity(override val lang: String, private val showType: String
     override fun animeDetailsParse(response: Response): SAnime {
         val title = json.decodeFromString<SingleShowResponse>(
             response.getData(),
-        ).props.title!!
+        ).props.title
+            ?: error("Anime details parsing error: title is null.")
 
         return title.toSAnimeUpdate(intl)
     }
@@ -306,7 +307,8 @@ class StreamingCommunity(override val lang: String, private val showType: String
                                 val seasonResponse = client.newCall(
                                     GET("${response.request.url}/season-${season.number}", inertiaHeaders),
                                 ).awaitSuccess() // Suspend call for network request
-                                json.decodeFromString<SingleShowResponse>(seasonResponse.body.string()).props.loadedSeason!!.episodes
+                                json.decodeFromString<SingleShowResponse>(seasonResponse.body.string()).props.loadedSeason?.episodes
+                                    ?: error("Failed to fetch episodes for season ${season.number}")
                             }
                             Pair(season, episodes) // Return season object and its episodes
                         }
@@ -391,9 +393,10 @@ class StreamingCommunity(override val lang: String, private val showType: String
         return if (headers["content-type"]?.contains("application/json") == true) {
             body.string()
         } else {
-            asJsoup().selectFirst("div#app[data-page]")!!
-                .attr("data-page")
-                .replace("&quot;", "\"")
+            asJsoup().selectFirst("div#app[data-page]")
+                ?.attr("data-page")
+                ?.replace("&quot;", "\"")
+                ?: error("Failed to extract data-page")
         }
     }
 
