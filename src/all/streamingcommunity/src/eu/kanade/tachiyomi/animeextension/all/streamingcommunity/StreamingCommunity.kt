@@ -25,6 +25,10 @@ import eu.kanade.tachiyomi.lib.playlistutils.PlaylistUtils
 import eu.kanade.tachiyomi.network.GET
 import eu.kanade.tachiyomi.network.awaitSuccess
 import eu.kanade.tachiyomi.util.asJsoup
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
 import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.OkHttpClient
@@ -289,17 +293,27 @@ class StreamingCommunity(override val lang: String, private val showType: String
             val seasonIntl = intl["season"]
             val episodeIntl = intl["episode"]
 
-            data.title.seasons.forEach { season ->
-                val episodeData = if (season.id == data.loadedSeason.id) {
-                    data.loadedSeason.episodes
-                } else {
-                    val body = client.newCall(
-                        GET("${response.request.url}/season-${season.number}", inertiaHeaders),
-                    ).execute().body.string()
-
-                    json.decodeFromString<SingleShowResponse>(body).props.loadedSeason!!.episodes
+            // Concurrently fetch episode data for all seasons
+            val allSeasonEpisodes = runBlocking { // Bridge to coroutine world
+                coroutineScope { // Create a scope for structured concurrency
+                    data.title.seasons.map { season ->
+                        async { // Launch each season fetch asynchronously
+                            val episodes = if (season.id == data.loadedSeason.id) {
+                                data.loadedSeason.episodes
+                            } else {
+                                val seasonResponse = client.newCall(
+                                    GET("${response.request.url}/season-${season.number}", inertiaHeaders),
+                                ).awaitSuccess() // Suspend call for network request
+                                json.decodeFromString<SingleShowResponse>(seasonResponse.body.string()).props.loadedSeason!!.episodes
+                            }
+                            Pair(season, episodes) // Return season object and its episodes
+                        }
+                    }.awaitAll() // Wait for all async operations to complete
                 }
+            }
 
+            // Process the fetched data
+            allSeasonEpisodes.forEach { (season, episodeData) ->
                 episodeData.forEach { episode ->
                     episodeList.add(
                         SEpisode.create().apply {
