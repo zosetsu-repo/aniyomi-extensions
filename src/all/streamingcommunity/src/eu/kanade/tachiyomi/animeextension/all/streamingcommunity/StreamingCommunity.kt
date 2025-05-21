@@ -70,7 +70,7 @@ class StreamingCommunity(override val lang: String, private val showType: String
         .add("Content-Type", "application/json")
         .add("X-Requested-With", "XMLHttpRequest")
         .add("X-Inertia", "true")
-        .add("x-inertia-version", "344b5a8233900846a870d192f686c3bc") // This requires up-to-date `version`
+        .add("x-inertia-version", "") // This requires an up-to-date `version`
         .build()
 
     private val json: Json by injectLazy()
@@ -210,7 +210,9 @@ class StreamingCommunity(override val lang: String, private val showType: String
         val parsed = if (isApiCall) {
             json.decodeFromString<PropObject>(response.getData()).titles
         } else {
-            json.decodeFromString<ShowsResponse>(response.getData()).props.titles
+            json.decodeFromString<ShowsResponse>(response.getData()).props
+                .also { imageCdn = "${it.cdn_url}/images/" }
+                .titles
         }
 
         val animeList = parsed.map {
@@ -285,7 +287,7 @@ class StreamingCommunity(override val lang: String, private val showType: String
                 .add("Content-Type", "application/json")
                 .add("X-Requested-With", "XMLHttpRequest")
                 .add("X-Inertia", "true")
-                .add("X-Inertia-Version", parsed.version!!)
+                .add("X-Inertia-Version", parsed.version ?: "")
                 .add("X-Inertia-Partial-Component", "Titles/Title")
                 .add("X-Inertia-Partial-Data", "loadedSeason,flash")
                 .build()
@@ -360,10 +362,10 @@ class StreamingCommunity(override val lang: String, private val showType: String
             .build()
 
         val iframe = client.newCall(GET(iframeUrl, iframeHeaders)).execute().asJsoup()
-        val script = iframe.selectFirst("script:containsData(masterPlaylist)")?.data()?.replace("\n", "\t") ?: return emptyList()
-        val playlistUrl = PLAYLIST_URL_REGEX.find(script)?.groupValues?.get(1) ?: return emptyList()
-        val token = TOKEN_REGEX.find(script)?.groupValues?.get(1) ?: return emptyList()
-        val expires = EXPIRES_REGEX.find(script)?.groupValues?.get(1) ?: return emptyList()
+        val script = iframe.selectFirst("script:containsData(masterPlaylist)")?.data()?.replace("\n", "\t") ?: error("Failed to extract masterPlaylist script")
+        val playlistUrl = PLAYLIST_URL_REGEX.find(script)?.groupValues?.get(1) ?: error("Failed to extract playlist URL")
+        val token = TOKEN_REGEX.find(script)?.groupValues?.get(1) ?: error("Failed to extract token")
+        val expires = EXPIRES_REGEX.find(script)?.groupValues?.get(1) ?: error("Failed to extract expires")
 
         val masterPlUrl = buildString {
             append(playlistUrl)
