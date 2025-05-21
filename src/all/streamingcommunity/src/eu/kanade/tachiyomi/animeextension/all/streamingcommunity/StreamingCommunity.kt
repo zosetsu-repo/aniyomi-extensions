@@ -356,14 +356,14 @@ class StreamingCommunity(override val lang: String, private val showType: String
     }
 
     // https://vixcloud.co/embed/262817?token=321fd9c4f94fcd28b522d1f3ba2a8d77&expires=1752778149&canPlayFHD=1&canBypassAds=1
-    private fun vixCloudExtractor(iframeUrl: String): List<Video> {
+    private suspend fun vixCloudExtractor(iframeUrl: String): List<Video> {
         val iframeHeaders = headers.newBuilder()
             .add("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8")
             .add("Host", iframeUrl.toHttpUrl().host)
             .add("Referer", "$baseUrl/")
             .build()
 
-        val iframe = client.newCall(GET(iframeUrl, iframeHeaders)).execute().asJsoup()
+        val iframe = client.newCall(GET(iframeUrl, iframeHeaders)).awaitSuccess().asJsoup()
         val script = iframe.selectFirst("script:containsData(masterPlaylist)")?.data()?.replace("\n", "\t") ?: error("Failed to extract masterPlaylist script")
         val playlistUrl = PLAYLIST_URL_REGEX.find(script)?.groupValues?.get(1) ?: error("Failed to extract playlist URL")
         val token = TOKEN_REGEX.find(script)?.groupValues?.get(1) ?: error("Failed to extract token")
