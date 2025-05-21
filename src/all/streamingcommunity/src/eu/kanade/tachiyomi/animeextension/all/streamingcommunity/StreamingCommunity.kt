@@ -364,10 +364,14 @@ class StreamingCommunity(override val lang: String, private val showType: String
             .build()
 
         val iframe = client.newCall(GET(iframeUrl, iframeHeaders)).awaitSuccess().asJsoup()
-        val script = iframe.selectFirst("script:containsData(masterPlaylist)")?.data()?.replace("\n", "\t") ?: error("Failed to extract masterPlaylist script")
-        val playlistUrl = PLAYLIST_URL_REGEX.find(script)?.groupValues?.get(1) ?: error("Failed to extract playlist URL")
-        val token = TOKEN_REGEX.find(script)?.groupValues?.get(1) ?: error("Failed to extract token")
-        val expires = EXPIRES_REGEX.find(script)?.groupValues?.get(1) ?: error("Failed to extract expires")
+        val script = iframe.selectFirst("script:containsData(masterPlaylist)")?.data()
+            ?: error("Failed to extract masterPlaylist script")
+        val playlistUrl = PLAYLIST_URL_REGEX.find(script)?.groupValues?.get(1)
+            ?: error("Failed to extract playlist URL")
+        val token = TOKEN_REGEX.find(script)?.groupValues?.get(1)
+            ?: error("Failed to extract token")
+        val expires = EXPIRES_REGEX.find(script)?.groupValues?.get(1)
+            ?: error("Failed to extract expires")
 
         val masterPlUrl = buildString {
             append(playlistUrl)
