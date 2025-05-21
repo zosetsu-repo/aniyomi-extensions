@@ -308,7 +308,7 @@ class StreamingCommunity(override val lang: String, private val showType: String
                                     GET("${response.request.url}/season-${season.number}", inertiaHeaders),
                                 ).awaitSuccess() // Suspend call for network request
                                 json.decodeFromString<SingleShowResponse>(seasonResponse.body.string()).props.loadedSeason?.episodes
-                                    ?: error("Failed to fetch episodes for season ${season.number}")
+                                    ?: emptyList()
                             }
                             Pair(season, episodes) // Return season object and its episodes
                         }
