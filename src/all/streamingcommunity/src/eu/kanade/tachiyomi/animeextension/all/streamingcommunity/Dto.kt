@@ -3,8 +3,7 @@ package eu.kanade.tachiyomi.animeextension.all.streamingcommunity
 import eu.kanade.tachiyomi.animesource.model.SAnime
 import eu.kanade.tachiyomi.lib.i18n.Intl
 import kotlinx.serialization.Serializable
-import java.math.BigDecimal
-import java.math.RoundingMode
+import kotlin.math.roundToInt
 
 @Serializable
 data class ShowsResponse(
@@ -162,8 +161,8 @@ data class SingleShowResponse(
             }
 
             private val fancyScore: String =
-                score?.toBigDecimalOrNull()?.div(BigDecimal(2))
-                    ?.setScale(0, RoundingMode.HALF_UP)?.toInt()
+                score?.toFloatOrNull()?.div(2f)
+                    ?.roundToInt()
                     ?.let {
                         buildString {
                             append("★".repeat(it))
