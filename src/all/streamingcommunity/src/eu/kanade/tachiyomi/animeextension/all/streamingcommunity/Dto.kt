@@ -152,6 +152,7 @@ data class SingleShowResponse(
                         .let { if (it.isNotBlank()) append("\n\n").append(intl["cast"]).append(": $it\n") }
                     imdb_id?.let { append("\n[IMDB](https://www.imdb.com/title/$it)") }
                     tmdb_id?.let { append("\n[TMDB](https://www.themoviedb.org/$type/$it)") }
+                    trailers.forEach { append("\n[Trailer](https://www.youtube.com/watch?v=${it.youtube_id})") }
                 }.toString()
 
                 description = desc
