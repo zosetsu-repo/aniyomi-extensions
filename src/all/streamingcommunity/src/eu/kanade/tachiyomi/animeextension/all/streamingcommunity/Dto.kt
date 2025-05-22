@@ -113,7 +113,7 @@ data class SingleShowResponse(
 
             @Serializable
             data class TrailerObject(
-                val name: String, // "Teaser Trailer"
+                val name: String?, // "Teaser Trailer"
                 val is_hd: Int, // 1
                 val youtube_id: String, // "0IqOJgtS5nw"
             )
