@@ -113,7 +113,7 @@ class RouVideo(
             async {
                 client.newCall(relatedAnimeListRequest(anime))
                     .execute()
-                    .let { response ->
+                    .use { response ->
                         relatedAnimeListParse(response)
                     }
             },
@@ -333,11 +333,13 @@ class RouVideo(
             runCatching {
                 client.newCall(tagsListRequest())
                     .execute()
-                    .asJsoup()
-                    .let(::tagsListParse)
-                    .let { tags ->
-                        if (tags.isNotEmpty()) {
-                            tagsArray = tags
+                    .use {
+                        it.asJsoup()
+                        .let(::tagsListParse)
+                        .let { tags ->
+                            if (tags.isNotEmpty()) {
+                                tagsArray = tags
+                            }
                         }
                     }
             }.onFailure { it.printStackTrace() }
@@ -379,13 +381,15 @@ class RouVideo(
         runCatching {
             client.newCall(hotSearchRequest())
                 .execute()
-                .asJsoup()
-                .let(::hotSearchParse)
-                .let {
-                    hotSearch = if (!this::hotSearch.isInitialized) {
-                        it
-                    } else {
-                        hotSearch.plus(it)
+                .use {
+                    it.asJsoup()
+                    .let(::hotSearchParse)
+                    .let {
+                        hotSearch = if (!this::hotSearch.isInitialized) {
+                            it
+                        } else {
+                            hotSearch.plus(it)
+                        }
                     }
                 }
         }.onFailure { it.printStackTrace() }
@@ -411,7 +415,7 @@ class RouVideo(
             ?.groupValues?.get(1)
         return client.newCall(animeDetailsRequest(anime))
             .execute()
-            .let { response ->
+            .use { response ->
                 parseAnimeDetails(response, resolution)
             }
     }
