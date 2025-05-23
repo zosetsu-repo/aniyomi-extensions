@@ -119,7 +119,7 @@ data class SingleShowResponse(
                 val is_hd: Int, // 1
                 val youtube_id: String, // "0IqOJgtS5nw"
             ) {
-                fun getName() = name?.takeIf { it.isNotBlank() } ?: "Trailer"
+                val displayName: String get() = name?.takeIf { it.isNotBlank() } ?: "Trailer"
             }
 
             @Serializable
@@ -156,10 +156,7 @@ data class SingleShowResponse(
                         .let { if (it.isNotBlank()) append("\n\n").append(intl["cast"]).append(": $it\n") }
                     imdb_id?.let { append("\n[IMDB](https://www.imdb.com/title/$it)") }
                     tmdb_id?.let { append("\n[TMDB](https://www.themoviedb.org/$type/$it)") }
-                    trailers.forEach {
-                        val trailerName = it.getName()
-                        append("\n[$trailerName](https://www.youtube.com/watch?v=${it.youtube_id})")
-                    }
+                    trailers.forEach { append("\n[${it.displayName}](https://www.youtube.com/watch?v=${it.youtube_id})") }
                 }.toString()
 
                 description = desc
